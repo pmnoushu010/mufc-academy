@@ -16,6 +16,11 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 // Serve static files
 app.use(express.static(__dirname));
 
+// Explicitly serve index.html for the root route to fix "Not Found" on some cloud environments
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
+
 // MongoDB Connection
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/mufc_academy';
 
