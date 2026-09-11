@@ -327,3 +327,128 @@ main::-webkit-scrollbar { display: none; }
     margin-right: 10px;
     font-weight: 600;
 }
+
+/* Responsive / Mobile View */
+@media (max-width: 768px) {
+    #app-screen {
+        flex-direction: column !important;
+    }
+    
+    #sidebar-nav {
+        width: 100%;
+        height: 70px;
+        flex-direction: row;
+        position: fixed;
+        bottom: 0;
+        z-index: 1000;
+        border-right: none;
+        border-top: 1px solid #374151;
+        padding: 0;
+        background-color: var(--bg-card);
+        overflow-x: auto;
+    }
+    
+    .sidebar-logo {
+        display: none;
+    }
+    
+    .side-nav {
+        flex-direction: row;
+        width: auto;
+        padding: 0 10px;
+        align-items: center;
+        margin: 0;
+        flex: 1;
+        justify-content: space-around;
+    }
+    
+    .nav-item {
+        padding: 10px 5px;
+        flex-direction: column;
+        gap: 4px;
+        border-radius: 8px;
+        font-size: 0.7rem;
+        flex: 1;
+        text-align: center;
+    }
+    
+    .nav-item i {
+        font-size: 1.2rem;
+        width: auto;
+    }
+    
+    .sidebar-footer {
+        padding: 0 10px;
+        margin: 0;
+        display: flex;
+        align-items: center;
+    }
+    
+    .sidebar-footer button {
+        padding: 10px;
+        font-size: 0; /* Hide text */
+        width: auto;
+        border-radius: 50%;
+        aspect-ratio: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .sidebar-footer button i {
+        font-size: 1.2rem;
+        margin: 0;
+    }
+    
+    #main-app-container {
+        height: 100vh;
+        padding-bottom: 70px; /* Space for bottom nav */
+    }
+    
+    header {
+        padding: 15px;
+    }
+    
+    .header-title-area h1 {
+        font-size: 1.2rem;
+    }
+    
+    main {
+        padding: 15px;
+    }
+    
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .login-container h1 {
+        font-size: 1.5rem;
+    }
+    
+    .login-container .logo-img-main {
+        width: 150px;
+    }
+    
+    .modal-content {
+        max-width: 95%;
+        padding: 20px;
+    }
+    
+    .user-card-top, .msg-item-top {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .match-meta span {
+        font-size: 0.75rem;
+    }
+    
+    /* Show limited tabs for attendance on mobile */
+    .attendance-tabs {
+        padding-bottom: 8px;
+    }
+    
+    .chat-wrapper {
+        height: 400px;
+    }
+}
