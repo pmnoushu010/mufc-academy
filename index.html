@@ -1,0 +1,957 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MUFC Academy</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+    <div id="desktop-app-container">
+        
+        <!-- Login Screen -->
+        <div id="login-screen" class="active screen">
+            <div class="login-container">
+                <img src="logo.png" alt="MUFC Academy Logo" class="logo-img-main">
+                <h1>MUFC Academy</h1>
+                <p>Welcome back! Please login.</p>
+                <div class="form-group">
+                    <input type="text" id="login-id" placeholder="ID Number or Email">
+                </div>
+                <div class="form-group">
+                    <input type="password" id="login-pass" placeholder="Password">
+                </div>
+                <div class="login-buttons" style="margin-top: 15px;">
+                    <button class="btn-primary w-100" onclick="handleLogin()"><i class="fa-solid fa-right-to-bracket"></i> Login</button>
+                    <button class="btn-secondary w-100" onclick="showScreen('register-screen')"><i class="fa-solid fa-user-plus"></i> Register</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Registration Screen -->
+        <div id="register-screen" class="screen" style="display: none;">
+            <div class="login-container">
+                <img src="logo.png" alt="MUFC Academy Logo" class="logo-img-main">
+                <h1 style="font-size: 1.5rem;">Join MUFC Academy</h1>
+                <p style="margin-bottom: 15px;">Register for a new account.</p>
+                <div class="form-group" style="display: flex; gap: 15px; margin-bottom: 15px; justify-content: center;">
+                    <label><input type="radio" name="reg-role" value="student" checked onchange="toggleRegRole()"> Student</label>
+                    <label><input type="radio" name="reg-role" value="coach" onchange="toggleRegRole()"> Coach</label>
+                </div>
+                <div class="form-group" id="group-reg-id">
+                    <input type="text" id="reg-id" placeholder="ID Number">
+                </div>
+                <div class="form-group" id="group-reg-name">
+                    <input type="text" id="reg-name" placeholder="Full Name">
+                </div>
+                <div class="form-group" id="group-reg-mobile" style="display: none;">
+                    <input type="tel" id="reg-mobile" placeholder="Mobile Number">
+                </div>
+                <div class="form-group" id="group-reg-dob">
+                    <input type="text" onfocus="(this.type='date')" onblur="(this.value == '' ? this.type='text' : this.type='date')" id="reg-dob" placeholder="Date of Birth" class="date-input">
+                </div>
+                <div class="form-group" id="group-reg-pic">
+                    <input type="file" id="reg-pic" accept="image/*" class="file-input" title="Profile Picture">
+                </div>
+                <div class="form-group" id="group-reg-email">
+                    <input type="email" id="reg-email" placeholder="Email Address">
+                </div>
+                <div class="form-group input-group" id="group-reg-whatsapp">
+                    <select id="reg-country-code" class="form-select" style="flex: 1;">
+                        <option value="+91">+91 (IN)</option>
+                        <option value="+971">+971 (UAE)</option>
+                        <option value="+44">+44 (UK)</option>
+                        <option value="+1">+1 (US)</option>
+                        <option value="+966">+966 (KSA)</option>
+                        <option value="+974">+974 (QA)</option>
+                    </select>
+                    <input type="tel" id="reg-whatsapp" placeholder="WhatsApp Number" style="flex: 2;">
+                </div>
+                <div class="form-group">
+                    <input type="password" id="reg-pass" placeholder="Password">
+                </div>
+                <div class="login-buttons" style="margin-top: 15px;">
+                    <button id="reg-submit-btn" class="btn-primary w-100" onclick="handleRegistration()" disabled><i class="fa-solid fa-check"></i> Register</button>
+                    <button class="btn-secondary w-100" onclick="showScreen('login-screen')">Back to Login</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- App Screen (Hidden initially) -->
+        <div id="app-screen" style="display: none; height: 100vh; flex-direction: row; width: 100%;">
+            
+            <!-- Sidebar Navigation -->
+            <aside id="sidebar-nav">
+                <div class="sidebar-logo">
+                    <img src="logo.png" alt="Logo" class="logo-img-sidebar">
+                    <h2 id="sidebar-title">MUFC Academy</h2>
+                </div>
+
+                <nav class="side-nav" id="admin-nav" style="display: none;">
+                    <a href="#" class="nav-item" onclick="switchView('admin-dashboard', event)">
+                        <i class="fa-solid fa-house"></i><span>Home</span>
+                    </a>
+                    <a href="#" class="nav-item" onclick="switchView('admin-approvals', event)">
+                        <i class="fa-solid fa-user-check"></i><span>Approvals</span>
+                    </a>
+                    <a href="#" class="nav-item" onclick="switchView('admin-attendance', event)">
+                        <i class="fa-solid fa-clipboard-check"></i><span>Attendance</span>
+                    </a>
+                    <a href="#" class="nav-item" onclick="switchView('admin-players', event)">
+                        <i class="fa-solid fa-users"></i><span>Players</span>
+                    </a>
+                    <a href="#" class="nav-item" onclick="switchView('admin-messages', event)">
+                        <i class="fa-solid fa-envelope"></i><span>Inbox</span>
+                    </a>
+                </nav>
+                
+                <nav class="side-nav" id="player-nav" style="display: none;">
+                    <a href="#" class="nav-item" onclick="switchView('player-dashboard', event)">
+                        <i class="fa-solid fa-chart-line"></i><span>Sessions</span>
+                    </a>
+                    <a href="#" class="nav-item" onclick="switchView('player-messages', event)">
+                        <i class="fa-solid fa-message"></i><span>Contact</span>
+                    </a>
+                </nav>
+
+                <nav class="side-nav" id="academy-nav" style="display: none;">
+                    <a href="#" class="nav-item active" onclick="switchView('academy-admin', event)">
+                        <i class="fa-solid fa-users"></i><span>Students</span>
+                    </a>
+                    <a href="#" class="nav-item" onclick="switchView('academy-attendance', event)">
+                        <i class="fa-solid fa-clipboard-check"></i><span>Attendance</span>
+                    </a>
+                    <a href="#" class="nav-item" onclick="switchView('academy-payments', event)">
+                        <i class="fa-solid fa-wallet"></i><span>Payments</span>
+                    </a>
+                    <a href="#" class="nav-item" onclick="switchView('academy-reports', event)">
+                        <i class="fa-solid fa-table"></i><span>Reports</span>
+                    </a>
+                    <a href="#" class="nav-item" onclick="switchView('academy-accounts', event)">
+                        <i class="fa-solid fa-file-invoice-dollar"></i><span>Accounts</span>
+                    </a>
+                    <a href="#" class="nav-item" onclick="switchView('academy-users', event)">
+                        <i class="fa-solid fa-user-shield"></i><span>Users</span>
+                    </a>
+                </nav>
+
+                <div class="sidebar-footer">
+                    <button class="btn-secondary w-100" style="border-color: #ef4444; color: #ef4444;" onclick="logout()"><i class="fa-solid fa-right-from-bracket"></i> Logout</button>
+                </div>
+            </aside>
+
+            <!-- Main Content Container -->
+            <div id="main-app-container">
+                <!-- Header -->
+                <header>
+                    <div class="header-title-area">
+                        <h1 id="header-title">MUFC Academy</h1>
+                    </div>
+                    <div class="header-actions" style="display: flex; align-items: center; gap: 12px;">
+                        <span id="header-user-name" style="font-weight: 500; font-size: 1rem; color: #fff;"></span>
+                        <i class="fa-solid fa-bell"></i>
+                        <div class="profile-pic" onclick="openProfileModal()" title="Profile"></div>
+                    </div>
+                </header>
+
+            <!-- Main Content Area -->
+            <main id="app-content">
+                
+                <!-- ====== ADMIN VIEWS ====== -->
+                <section id="view-admin-dashboard" class="view">
+                    <div class="welcome-card">
+                        <h2>Welcome, Manager</h2>
+                        <p id="admin-next-session-text">Next Practice: Wednesday at 18:00</p>
+                    </div>
+                    <div class="stats-grid" style="grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+                        <div class="stat-card" style="padding: 14px 10px; flex-direction: column; text-align: center; gap: 8px;">
+                            <i class="fa-solid fa-users" style="padding: 8px; font-size: 1.2rem;"></i>
+                            <div class="stat-info">
+                                <h3 id="stat-total-players" style="font-size: 1.1rem;">24</h3>
+                                <p style="font-size: 0.7rem;">Players</p>
+                            </div>
+                        </div>
+                        <div class="stat-card" style="padding: 14px 10px; flex-direction: column; text-align: center; gap: 8px;">
+                            <i class="fa-solid fa-user-clock" style="padding: 8px; font-size: 1.2rem;"></i>
+                            <div class="stat-info">
+                                <h3 id="stat-pending" style="font-size: 1.1rem;">0</h3>
+                                <p style="font-size: 0.7rem;">Pending Users</p>
+                            </div>
+                        </div>
+                        <div class="stat-card" style="padding: 14px 10px; flex-direction: column; text-align: center; gap: 8px; cursor: pointer;" onclick="switchView('admin-attendance')">
+                            <i class="fa-solid fa-clipboard-check" style="padding: 8px; font-size: 1.2rem; color: #38bdf8; background: rgba(56, 189, 248, 0.1);"></i>
+                            <div class="stat-info">
+                                <h3 id="stat-pending-attendance" style="font-size: 1.1rem; color: #38bdf8;">0</h3>
+                                <p style="font-size: 0.7rem;">Check-in Reqs</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Practice Session Overview Card with Admin Update Option -->
+                    <div class="match-card" style="margin-top: 15px; border-color: rgba(56, 189, 248, 0.3);">
+                        <div class="match-card-header">
+                            <span class="match-badge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8;"><i class="fa-solid fa-person-running"></i> Practice Session</span>
+                            <span style="font-size: 0.75rem; color: var(--text-muted);" id="admin-practice-datetime-preview">Wed, 2026-09-03 • 18:00</span>
+                        </div>
+                        <div class="match-title" id="admin-practice-title-preview">Tactical Drills & Fitness Training</div>
+                        <div class="match-meta" style="flex-direction: column; gap: 6px; margin-bottom: 12px;">
+                            <span><i class="fa-solid fa-location-dot" style="color: #38bdf8;"></i> Ground: <strong id="admin-practice-location-preview" style="color: #fff; margin-left: 4px;">Carrington Pitch 2</strong></span>
+                            <span><i class="fa-solid fa-users" style="color: var(--primary);"></i> <strong id="admin-practice-present-count">0</strong> Players Confirmed Present</span>
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="btn-primary" style="flex: 1; padding: 10px 14px; font-size: 0.82rem;" onclick="showEditPracticeModal()">
+                                <i class="fa-solid fa-pen-to-square"></i> Update Practice Schedule
+                            </button>
+                            <button class="btn-secondary" style="padding: 10px 14px; font-size: 0.82rem;" onclick="switchView('admin-attendance')">
+                                <i class="fa-solid fa-clipboard-check"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Match Overview Card -->
+                    <div class="match-card" style="margin-top: 12px;">
+                        <div class="match-card-header">
+                            <span class="match-badge"><i class="fa-solid fa-futbol"></i> Upcoming Match</span>
+                            <span style="font-size: 0.75rem; color: var(--text-muted);">2026-09-02 • 18:00</span>
+                        </div>
+                        <div class="match-title">vs City FC (Premier League)</div>
+                        <div class="match-meta">
+                            <span><i class="fa-solid fa-location-dot"></i> Old Trafford</span>
+                            <span><i class="fa-solid fa-users"></i> <strong id="admin-match-present-count">0</strong> Confirmed Present</span>
+                        </div>
+                        <button class="btn-secondary w-100" onclick="switchView('admin-attendance')">
+                            <i class="fa-solid fa-clipboard-list"></i> Manage Match Attendance
+                        </button>
+                    </div>
+                </section>
+
+                <section id="view-admin-approvals" class="view">
+                    <div class="view-header">
+                        <div>
+                            <h2>Pending Approvals</h2>
+                            <p style="font-size: 0.8rem; color: var(--text-muted);">Review credentials & approve access</p>
+                        </div>
+                    </div>
+                    <div id="approval-list" class="player-list"></div>
+                </section>
+
+                <!-- Admin Attendance Management & Summary View -->
+                <section id="view-admin-attendance" class="view">
+                    <div class="view-header">
+                        <div>
+                            <h2>Session Attendance</h2>
+                            <p style="font-size: 0.8rem; color: var(--text-muted);">Approve practice & match presence</p>
+                        </div>
+                        <button class="btn-secondary btn-sm" onclick="showEditPracticeModal()" title="Edit Practice Schedule" style="padding: 8px 12px; font-size: 0.78rem; border-radius: 10px;">
+                            <i class="fa-solid fa-calendar-pen"></i> Edit Practice
+                        </button>
+                    </div>
+
+                    <!-- Attendance Tabs -->
+                    <div class="attendance-tabs">
+                        <button class="attendance-tab-btn active" id="tab-btn-mark" onclick="switchAttendanceTab('mark')">
+                            <i class="fa-solid fa-list-check"></i> Mark Attendance
+                        </button>
+                        <button class="attendance-tab-btn" id="tab-btn-summary" onclick="switchAttendanceTab('summary')">
+                            <i class="fa-solid fa-chart-pie"></i> Squad Summary
+                        </button>
+                    </div>
+
+                    <!-- Section: Mark Player Attendance -->
+                    <div id="admin-attendance-mark-tab">
+                        <div class="section-title" style="font-size: 0.95rem; display: flex; justify-content: space-between; align-items: center;">
+                            <span>Add Attendance</span>
+                            <span style="font-size: 0.75rem; color: var(--text-muted);">Practice & Matches</span>
+                        </div>
+                        <div id="admin-attendance-mark-list" class="player-list">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- Section: Squad Attendance Summary -->
+                    <div id="admin-attendance-summary-tab" style="display: none;">
+                        <div class="activity-card" style="margin-bottom: 15px; padding: 15px;">
+                            <div class="activity-stat">
+                                <h3 class="good-stat" id="admin-squad-attendance-rate">88%</h3>
+                                <p>Squad Rate</p>
+                            </div>
+                            <div class="activity-stat">
+                                <h3 id="admin-total-matches-count">4</h3>
+                                <p>Total Sessions</p>
+                            </div>
+                            <div class="activity-stat">
+                                <h3 id="admin-squad-present-today">0</h3>
+                                <p>Present Next Practice</p>
+                            </div>
+                        </div>
+
+                        <div class="section-title" style="font-size: 0.95rem; margin-top: 10px;">Player Attendance Records</div>
+                        <div id="admin-attendance-summary-list">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+                </section>
+
+                <section id="view-admin-players" class="view">
+                    <div class="view-header">
+                        <div>
+                            <h2>Users & Squad</h2>
+                            <p style="font-size: 0.8rem; color: var(--text-muted);">User information & credentials</p>
+                        </div>
+                        <button class="btn-primary" onclick="showAddPlayerModal()" title="Add New User"><i class="fa-solid fa-user-plus"></i></button>
+                    </div>
+                    <div id="player-list" class="player-list"></div>
+                </section>
+
+                <!-- Admin Inbox & Response View -->
+                <section id="view-admin-messages" class="view">
+                    <!-- Inbox List View -->
+                    <div id="admin-inbox-view">
+                        <div class="view-header">
+                            <div>
+                                <h2>Admin Inbox</h2>
+                                <p style="font-size: 0.8rem; color: var(--text-muted);">Messages from players & users</p>
+                            </div>
+                        </div>
+                        <div id="admin-message-list" class="message-list">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+
+                    <!-- Admin Two-Way Chat View with Specific User -->
+                    <div id="admin-chat-view" style="display: none;">
+                        <div class="view-header" style="margin: 10px 0 15px 0;">
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                <button class="btn-secondary" onclick="closeAdminChat()" style="padding: 8px 12px; font-size: 0.85rem; border-radius: 10px;">
+                                    <i class="fa-solid fa-arrow-left"></i>
+                                </button>
+                                <div>
+                                    <h3 id="admin-chat-recipient-name" style="font-size: 1.1rem; margin-bottom: 2px;">User</h3>
+                                    <span style="font-size: 0.75rem; color: #10b981;"><i class="fa-solid fa-circle" style="font-size: 0.55rem;"></i> Active Chat</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="chat-wrapper" style="height: 530px;">
+                            <div class="chat-container" id="admin-chat-container">
+                                <!-- Messages go here -->
+                            </div>
+                            <div class="chat-input-area">
+                                <input type="text" id="admin-msg-input" placeholder="Type a response to player..." onkeypress="handleAdminChatKey(event)">
+                                <button onclick="sendAdminMessage()"><i class="fa-solid fa-paper-plane"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                
+                <!-- ====== ACADEMY ADMIN VIEWS ====== -->
+                <section id="view-academy-admin" class="view">
+                    <div class="view-header">
+                        <div>
+                            <h2>Academy Portal</h2>
+                            <p style="font-size: 0.8rem; color: var(--text-muted);">Manage MUFC Academy Students</p>
+                        </div>
+                        <button class="btn-primary" onclick="showAddAcademyStudentModal()" title="Add New Student"><i class="fa-solid fa-user-plus"></i></button>
+                    </div>
+                    <div id="academy-student-list" class="player-list">
+                        <!-- Populated dynamically -->
+                    </div>
+                </section>
+
+                <section id="view-academy-attendance" class="view">
+                    <div class="view-header">
+                        <div>
+                            <h2>Academy Attendance</h2>
+                            <p style="font-size: 0.8rem; color: var(--text-muted);">Mark daily attendance & view strength</p>
+                        </div>
+                        <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 8px;">
+                            <input type="date" id="academy-attendance-date" class="form-select" style="padding: 8px; width: 140px; background: rgba(15, 23, 42, 0.8);" onclick="this.showPicker()" onchange="renderAcademyAttendance()">
+                            <button class="btn-secondary" style="font-size: 0.75rem; padding: 6px 10px;" onclick="openAttendanceHistoryModal()"><i class="fa-solid fa-clock-rotate-left"></i> History</button>
+                        </div>
+                    </div>
+                    
+                    <div class="activity-card" style="margin-bottom: 20px; padding: 15px;">
+                        <div class="activity-stat" style="text-align: center; width: 100%;">
+                            <h3 class="good-stat" id="academy-total-strength">0 / 0</h3>
+                            <p>Total Present Today</p>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-bottom: 20px;">
+                        <input type="text" id="academy-attendance-search" placeholder="Search student name..." class="form-input" style="width: 100%; padding: 12px; border-radius: 8px; background: var(--bg-card); color: #fff; border: 1px solid #374151; font-size: 1rem;" onkeyup="renderAcademyAttendance()">
+                    </div>
+                    
+                    <div id="academy-attendance-list" class="player-list">
+                        <!-- Populated dynamically -->
+                    </div>
+                </section>
+
+                <section id="view-academy-payments" class="view">
+                    <div class="view-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <div>
+                            <h2>Fee Payments</h2>
+                            <p style="font-size: 0.8rem; color: var(--text-muted);">Manage student monthly fees</p>
+                        </div>
+                        <div style="display: flex; gap: 15px; align-items: center;">
+                            <div style="font-size: 1.1rem; font-weight: bold; color: #10b981;">Total: <span id="academy-payment-total">0</span> SAR</div>
+                            <input type="month" id="academy-payment-month" class="form-select" style="padding: 8px; width: 140px; background: rgba(15, 23, 42, 0.8);" onclick="this.showPicker()" onchange="renderAcademyPayments()">
+                        </div>
+                    </div>
+                    
+                    <div style="display: flex; gap: 15px; margin-bottom: 20px;">
+                        <input type="text" id="academy-payment-search" placeholder="Search student name..." class="form-input" style="flex: 2; padding: 12px; border-radius: 8px; background: var(--bg-card); color: #fff; border: 1px solid #374151; font-size: 1rem;" onkeyup="renderAcademyPayments()">
+                        <select id="academy-payment-filter" class="form-select" style="flex: 1; padding: 12px; border-radius: 8px; background: var(--bg-card); color: #fff; border: 1px solid #374151; font-size: 1rem;" onchange="renderAcademyPayments()">
+                            <option value="all">All Status</option>
+                            <option value="paid">Paid</option>
+                            <option value="unpaid">Unpaid</option>
+                        </select>
+                    </div>
+                    
+                    <div style="display: flex; align-items: center; padding: 0 20px 10px 20px; color: var(--text-muted); font-size: 1rem; font-weight: bold; border-bottom: 1px solid #374151; margin-bottom: 10px;">
+                        <div style="min-width: 250px;">Student Name</div>
+                        <div style="display: flex; align-items: center; gap: 15px; flex: 1; justify-content: flex-end;">
+                            <div style="width: 250px;">Remarks</div>
+                            <div style="width: 11px;"></div>
+                            <div style="width: 85px; text-align: center;">Amount</div>
+                            <div style="width: 90px; text-align: center;">Status</div>
+                            <div style="width: 110px; text-align: center;">Action</div>
+                        </div>
+                    </div>
+                    
+                    <div id="academy-payment-list" class="player-list">
+                        <!-- Populated dynamically -->
+                    </div>
+                </section>
+
+                <section id="view-academy-reports" class="view">
+                    <div class="view-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <div>
+                            <h2>Academy Reports</h2>
+                            <p style="font-size: 0.8rem; color: var(--text-muted);">Comprehensive data table with Excel export</p>
+                        </div>
+                        <div style="display: flex; gap: 15px; align-items: center;">
+                            <input type="month" id="academy-report-month" class="form-select" style="padding: 8px; width: 140px; background: rgba(15, 23, 42, 0.8);" onclick="this.showPicker()" onchange="renderAcademyReports()">
+                            <button class="btn-primary" onclick="exportAcademyReportToExcel()"><i class="fa-solid fa-file-excel"></i> Export</button>
+                        </div>
+                    </div>
+                    
+                    <div style="overflow-x: auto; background: var(--bg-card); border-radius: 12px; border: 1px solid #374151;">
+                        <table id="academy-report-table" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem; color: #fff;">
+                            <!-- Populated dynamically -->
+                        </table>
+                    </div>
+                </section>
+
+                <section id="view-academy-accounts" class="view">
+                    <div class="view-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <div>
+                            <h2>Account Statement</h2>
+                            <p style="font-size: 0.8rem; color: var(--text-muted);">Manage balance sheet and expenses</p>
+                        </div>
+                        <div style="display: flex; gap: 15px; align-items: center;">
+                            <input type="month" id="academy-account-month" class="form-select" style="padding: 8px; width: 140px; background: rgba(15, 23, 42, 0.8);" onclick="this.showPicker()" onchange="renderAcademyAccounts()">
+                            <button class="btn-primary" onclick="exportAcademyAccountsToExcel()"><i class="fa-solid fa-file-excel"></i> Export</button>
+                        </div>
+                    </div>
+
+                    <!-- Summary Cards -->
+                    <div class="stats-grid" style="grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                        <div class="stat-card" style="padding: 15px; flex-direction: column; text-align: center; gap: 8px; border-color: #10b981;">
+                            <i class="fa-solid fa-arrow-trend-up" style="padding: 10px; font-size: 1.2rem; color: #10b981; background: rgba(16, 185, 129, 0.1);"></i>
+                            <div class="stat-info">
+                                <h3 id="account-total-income" style="font-size: 1.2rem; color: #10b981;">0 SAR</h3>
+                                <p style="font-size: 0.8rem;">Total Income</p>
+                            </div>
+                        </div>
+                        <div class="stat-card" style="padding: 15px; flex-direction: column; text-align: center; gap: 8px; border-color: #ef4444;">
+                            <i class="fa-solid fa-arrow-trend-down" style="padding: 10px; font-size: 1.2rem; color: #ef4444; background: rgba(239, 68, 68, 0.1);"></i>
+                            <div class="stat-info">
+                                <h3 id="account-total-expense" style="font-size: 1.2rem; color: #ef4444;">0 SAR</h3>
+                                <p style="font-size: 0.8rem;">Total Expense</p>
+                            </div>
+                        </div>
+                        <div class="stat-card" style="padding: 15px; flex-direction: column; text-align: center; gap: 8px; border-color: #38bdf8;">
+                            <i class="fa-solid fa-scale-balanced" style="padding: 10px; font-size: 1.2rem; color: #38bdf8; background: rgba(56, 189, 248, 0.1);"></i>
+                            <div class="stat-info">
+                                <h3 id="account-net-balance" style="font-size: 1.2rem; color: #38bdf8;">0 SAR</h3>
+                                <p style="font-size: 0.8rem;">Net Balance</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Add Entry Form -->
+                    <div style="background: var(--bg-card); padding: 15px; border-radius: 12px; border: 1px solid #374151; margin-bottom: 20px;">
+                        <h3 style="font-size: 0.95rem; margin-bottom: 12px; color: var(--text-muted);">Add New Transaction</h3>
+                        <div style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;">
+                            <div style="flex: 1; min-width: 120px;">
+                                <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Date</label>
+                                <input type="date" id="acc-input-date" class="form-input" style="width: 100%; padding: 10px; border-radius: 8px; background: rgba(15, 23, 42, 0.8); color: white; border: 1px solid #374151;" onclick="this.showPicker()">
+                            </div>
+                            <div style="flex: 2; min-width: 200px;">
+                                <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Description</label>
+                                <input type="text" id="acc-input-desc" class="form-input" style="width: 100%; padding: 10px; border-radius: 8px; background: rgba(15, 23, 42, 0.8); color: white; border: 1px solid #374151;">
+                            </div>
+                            <div style="flex: 1; min-width: 120px;">
+                                <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Amount (SAR)</label>
+                                <input type="number" id="acc-input-amount" class="form-input" style="width: 100%; padding: 10px; border-radius: 8px; background: rgba(15, 23, 42, 0.8); color: white; border: 1px solid #374151;">
+                            </div>
+                            <div style="flex: 1; min-width: 120px;">
+                                <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Type</label>
+                                <select id="acc-input-type" class="form-select" style="width: 100%; padding: 10px; border-radius: 8px; background: rgba(15, 23, 42, 0.8); color: white; border: 1px solid #374151;">
+                                    <option value="expense">Expense (-)</option>
+                                    <option value="income">Income (+)</option>
+                                </select>
+                            </div>
+                            <button class="btn-primary" style="padding: 10px 15px; border-radius: 8px; height: 42px;" onclick="addAccountEntry()">
+                                <i class="fa-solid fa-plus"></i> Add
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Account Statement Table -->
+                    <div style="display: flex; align-items: center; padding: 0 20px 10px 20px; color: var(--text-muted); font-size: 0.95rem; font-weight: bold; border-bottom: 1px solid #374151; margin-bottom: 10px;">
+                        <div style="width: 120px;">Date</div>
+                        <div style="flex: 1; min-width: 200px;">Description</div>
+                        <div style="width: 120px; text-align: right; color: #10b981;">Income (+)</div>
+                        <div style="width: 120px; text-align: right; color: #ef4444;">Expense (-)</div>
+                        <div style="width: 60px; text-align: center;">Action</div>
+                    </div>
+                    
+                    <div id="academy-accounts-list" class="player-list">
+                        <!-- Populated dynamically -->
+                    </div>
+                </section>
+
+                <section id="view-academy-users" class="view">
+                    <div class="view-header" style="margin-bottom: 20px;">
+                        <h2>User Management</h2>
+                        <p style="font-size: 0.8rem; color: var(--text-muted);">Manage admin access and permissions</p>
+                    </div>
+
+                    <!-- Add User Form -->
+                    <div style="background: var(--bg-card); padding: 15px; border-radius: 12px; border: 1px solid #374151; margin-bottom: 20px;">
+                        <h3 style="font-size: 0.95rem; margin-bottom: 12px; color: var(--text-muted);">Create New User</h3>
+                        <div style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;">
+                            <div style="flex: 2; min-width: 200px;">
+                                <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Username / Login ID</label>
+                                <input type="text" id="admin-input-user" class="form-input" style="width: 100%; padding: 10px; border-radius: 8px; background: rgba(15, 23, 42, 0.8); color: white; border: 1px solid #374151;">
+                            </div>
+                            <div style="flex: 2; min-width: 200px;">
+                                <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Password</label>
+                                <input type="text" id="admin-input-pass" class="form-input" style="width: 100%; padding: 10px; border-radius: 8px; background: rgba(15, 23, 42, 0.8); color: white; border: 1px solid #374151;">
+                            </div>
+                            <div style="flex: 1; min-width: 120px;">
+                                <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 4px;">User Type</label>
+                                <select id="admin-input-type" class="form-select" style="width: 100%; padding: 10px; border-radius: 8px; background: rgba(15, 23, 42, 0.8); color: white; border: 1px solid #374151;">
+                                    <option value="normal">Normal</option>
+                                    <option value="main">Main</option>
+                                </select>
+                            </div>
+                            <button class="btn-primary" style="padding: 10px 15px; border-radius: 8px; height: 42px;" onclick="addAcademyUser()">
+                                <i class="fa-solid fa-plus"></i> Create User
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Users Table -->
+                    <div style="display: flex; align-items: center; padding: 0 20px 10px 20px; color: var(--text-muted); font-size: 0.95rem; font-weight: bold; border-bottom: 1px solid #374151; margin-bottom: 10px;">
+                        <div style="flex: 2; min-width: 200px;">Username</div>
+                        <div style="flex: 2; min-width: 200px;">Password</div>
+                        <div style="width: 150px;">Type</div>
+                        <div style="width: 80px; text-align: center;">Action</div>
+                    </div>
+                    
+                    <div id="academy-users-list" class="player-list">
+                        <!-- Populated dynamically -->
+                    </div>
+                </section>
+
+                <!-- ====== PLAYER VIEWS ====== -->
+                <section id="view-player-dashboard" class="view">
+                    <div class="welcome-card">
+                        <h2>Welcome, <span id="current-player-name">Player</span></h2>
+                        <p id="player-next-session-text">Next Practice: Wednesday at 18:00</p>
+                    </div>
+
+                    <!-- Next Practice Session Card -->
+                    <div class="section-title">Practice Session & Ground</div>
+                    <div id="player-next-practice-card" class="match-card" style="border-color: rgba(56, 189, 248, 0.3);">
+                        <!-- Populated dynamically by JS -->
+                    </div>
+
+                    <!-- Next Match Presence Check-in Card -->
+                    <div class="section-title">Match Presence & Check-in</div>
+                    <div id="player-next-match-card" class="match-card">
+                        <!-- Populated dynamically by JS -->
+                    </div>
+                    
+                    <div class="section-title">My Attendance & Activity</div>
+                    <div class="activity-card">
+                        <div class="activity-stat">
+                            <h3 class="good-stat" id="player-attendance-rate">85%</h3>
+                            <p>Attendance</p>
+                        </div>
+                        <div class="activity-stat">
+                            <h3 id="player-matches-played">12</h3>
+                            <p>Attended</p>
+                        </div>
+                        <div class="activity-stat">
+                            <h3 id="player-goals-count">4</h3>
+                            <p>Goals</p>
+                        </div>
+                    </div>
+
+                    <div class="section-title" style="margin-top: 24px;">Sessions & Performance</div>
+                    <div id="player-matches-list" class="player-list">
+                        <!-- Populated dynamically -->
+                    </div>
+                </section>
+
+                <section id="view-player-messages" class="view">
+                    <div class="view-header">
+                        <div>
+                            <h2>Contact Admin</h2>
+                            <p style="font-size: 0.8rem; color: var(--text-muted);">Direct message with Team Management</p>
+                        </div>
+                    </div>
+                    <div class="chat-wrapper" style="height: 540px;">
+                        <div class="chat-container" id="player-chat-container">
+                            <!-- Messages go here -->
+                        </div>
+                        <div class="chat-input-area">
+                            <input type="text" id="player-msg-input" placeholder="Type a message to Admin..." onkeypress="handlePlayerChatKey(event)">
+                            <button onclick="sendPlayerMessage()"><i class="fa-solid fa-paper-plane"></i></button>
+                        </div>
+                    </div>
+                </section>
+                
+            </main>
+            </div>
+        </div>
+
+        <!-- Add Academy Student Modal -->
+        <div id="add-academy-student-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 id="modal-title-add-member">Add Academy Student</h2>
+                    <button class="close-btn" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div class="modal-body" style="max-height: 70vh; overflow-y: auto; padding-right: 5px;">
+                    <div class="form-group" style="display: flex; gap: 15px; margin-bottom: 15px;">
+                        <label><input type="radio" name="new-acad-role" value="student" checked onchange="toggleAcademyRole()"> Student</label>
+                        <label><input type="radio" name="new-acad-role" value="coach" onchange="toggleAcademyRole()"> Coach</label>
+                    </div>
+                    <div class="form-group" id="group-acad-name">
+                        <label id="label-acad-name">Student Name</label>
+                        <input type="text" id="new-acad-student-name" placeholder="Student Name">
+                    </div>
+                    <div class="form-group" id="group-acad-father">
+                        <label>Father's Name</label>
+                        <input type="text" id="new-acad-father-name" placeholder="Father's Name">
+                    </div>
+                    <div class="form-group" id="group-acad-id">
+                        <label>ID Number</label>
+                        <input type="text" id="new-acad-id" placeholder="ID Number">
+                    </div>
+                    <div class="form-group" id="group-acad-dob">
+                        <label>Date of Birth</label>
+                        <input type="text" onfocus="(this.type='date')" onblur="(this.value == '' ? this.type='text' : this.type='date')" id="new-acad-dob" placeholder="Date of Birth">
+                    </div>
+                    <div class="form-group" id="group-acad-contact">
+                        <label>Contact Number (Mobile)</label>
+                        <input type="tel" id="new-acad-contact" placeholder="Contact Number">
+                    </div>
+                    <div class="form-group">
+                        <label>WhatsApp Number</label>
+                        <div class="input-group">
+                            <select id="new-acad-whatsapp-code" class="form-select" style="flex: 1;">
+                                <option value="+91">+91 (IN)</option>
+                                <option value="+971">+971 (UAE)</option>
+                                <option value="+44">+44 (UK)</option>
+                                <option value="+966">+966 (KSA)</option>
+                            </select>
+                            <input type="tel" id="new-acad-whatsapp" placeholder="WhatsApp Number" style="flex: 2;">
+                        </div>
+                    </div>
+                    <div class="form-group" id="group-acad-join">
+                        <label>Joining Date</label>
+                        <input type="text" onfocus="(this.type='date')" onblur="(this.value == '' ? this.type='text' : this.type='date')" id="new-acad-join-date" placeholder="Joining Date">
+                    </div>
+                    <div class="form-group" id="group-acad-pic">
+                        <label>Profile Picture</label>
+                        <input type="file" id="new-acad-pic" accept="image/*" class="file-input">
+                    </div>
+                    <button class="btn-primary w-100" id="btn-add-acad-student" onclick="addAcademyStudent()" style="margin-top: 15px;">Register Student</button>
+                </div>
+            </div>
+        </div>
+        <!-- View Academy Student Modal -->
+        <div id="view-academy-student-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Student Profile</h2>
+                    <button class="close-btn" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div class="modal-body" style="text-align: center;">
+                    <div id="view-acad-pic" class="profile-pic" style="width: 80px; height: 80px; margin: 0 auto 15px auto;"></div>
+                    <h3 id="view-acad-name" style="font-size: 1.5rem; margin-bottom: 5px;"></h3>
+                    <p style="color: var(--text-muted); margin-bottom: 20px;">ID: <span id="view-acad-id"></span></p>
+                    
+                    <div style="text-align: left; background: var(--bg-dark); padding: 15px; border-radius: 12px; display: flex; flex-direction: column; gap: 10px;">
+                        <div><strong>Father's Name:</strong> <span id="view-acad-father" style="color: var(--text-muted);"></span></div>
+                        <div><strong>Age:</strong> <span id="view-acad-age" style="color: var(--text-muted);"></span> (<span id="view-acad-dob"></span>)</div>
+                        <div><strong>Contact:</strong> <span id="view-acad-contact" style="color: var(--text-muted);"></span></div>
+                        <div><strong>WhatsApp:</strong> <span id="view-acad-whatsapp" style="color: var(--text-muted);"></span></div>
+                        <div><strong>Joined:</strong> <span id="view-acad-joined" style="color: var(--text-muted);"></span></div>
+                        <div style="border-top: 1px solid #374151; padding-top: 10px; margin-top: 5px;"><strong>Total Attended:</strong> <span id="view-acad-attended" style="color: #10b981; font-weight: bold;"></span></div>
+                    </div>
+                    <div style="display: flex; gap: 10px; margin-top: 15px;">
+                        <button class="btn-primary" style="flex: 1;" onclick="openEditAcademyStudentModal()"><i class="fa-solid fa-pen"></i> Edit Profile</button>
+                        <button class="btn-secondary" style="flex: 1; border-color: #ef4444; color: #ef4444;" onclick="deleteAcademyStudent()"><i class="fa-solid fa-trash"></i> Delete</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Edit Academy Student Modal -->
+        <div id="edit-academy-student-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Edit Student Profile</h2>
+                    <button class="close-btn" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div class="modal-body" style="max-height: 70vh; overflow-y: auto; padding-right: 5px;">
+                    <div class="form-group">
+                        <label>Student Name</label>
+                        <input type="text" id="edit-acad-student-name" placeholder="Student Name">
+                    </div>
+                    <div class="form-group">
+                        <label>Father's Name</label>
+                        <input type="text" id="edit-acad-father-name" placeholder="Father's Name">
+                    </div>
+                    <div class="form-group">
+                        <label>ID Number</label>
+                        <input type="text" id="edit-acad-id" placeholder="ID Number" disabled>
+                    </div>
+                    <div class="form-group">
+                        <label>Date of Birth</label>
+                        <input type="text" onfocus="(this.type='date')" onblur="(this.value == '' ? this.type='text' : this.type='date')" id="edit-acad-dob" placeholder="Date of Birth">
+                    </div>
+                    <div class="form-group">
+                        <label>Contact Number</label>
+                        <input type="tel" id="edit-acad-contact" placeholder="Contact Number">
+                    </div>
+                    <div class="form-group">
+                        <label>WhatsApp Number</label>
+                        <div class="input-group">
+                            <select id="edit-acad-whatsapp-code" class="form-select" style="flex: 1;">
+                                <option value="+91">+91 (IN)</option>
+                                <option value="+971">+971 (UAE)</option>
+                                <option value="+44">+44 (UK)</option>
+                                <option value="+966">+966 (KSA)</option>
+                            </select>
+                            <input type="tel" id="edit-acad-whatsapp" placeholder="WhatsApp Number" style="flex: 2;">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Joining Date</label>
+                        <input type="text" onfocus="(this.type='date')" onblur="(this.value == '' ? this.type='text' : this.type='date')" id="edit-acad-join-date" placeholder="Joining Date">
+                    </div>
+                    <div class="form-group">
+                        <label>Update Profile Picture</label>
+                        <input type="file" id="edit-acad-pic" accept="image/*" class="file-input">
+                    </div>
+                    <button class="btn-primary w-100" onclick="updateAcademyStudent()" style="margin-top: 15px;">Update Profile</button>
+                </div>
+            </div>
+        </div>
+
+
+
+        <!-- Attendance History Modal -->
+        <div id="attendance-history-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Attendance History</h2>
+                    <button class="close-btn" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div class="modal-body" style="max-height: 70vh; overflow-y: auto; padding-right: 5px;" id="attendance-history-list">
+                    <!-- Populated dynamically -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Edit Practice Schedule Modal -->
+        <div id="edit-practice-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Update Practice Schedule</h2>
+                    <button class="close-btn" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>Practice Title / Focus</label>
+                        <input type="text" id="practice-input-title" placeholder="e.g. Tactical Drills & Set Pieces">
+                    </div>
+                    <div class="form-group">
+                        <label>Day of Week</label>
+                        <select id="practice-input-day" class="form-select" style="width: 100%; padding: 12px 14px; background: rgba(15, 23, 42, 0.8); border: 1px solid #374151; border-radius: 12px; color: #fff; font-family: inherit; font-size: 0.9rem;">
+                            <option value="Monday">Monday</option>
+                            <option value="Tuesday">Tuesday</option>
+                            <option value="Wednesday">Wednesday</option>
+                            <option value="Thursday">Thursday</option>
+                            <option value="Friday">Friday</option>
+                            <option value="Saturday">Saturday</option>
+                            <option value="Sunday">Sunday</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Practice Date</label>
+                        <input type="text" onfocus="(this.type='date')" onblur="(this.value == '' ? this.type='text' : this.type='date')" id="practice-input-date" placeholder="Practice Date" class="date-input">
+                    </div>
+                    <div class="form-group">
+                        <label>Time</label>
+                        <input type="text" id="practice-input-time" placeholder="e.g. 18:00 - 20:00">
+                    </div>
+                    <div class="form-group">
+                        <label>Ground / Pitch Location</label>
+                        <input type="text" id="practice-input-location" placeholder="e.g. Carrington Training Pitch 2">
+                    </div>
+                    <div class="form-group">
+                        <label>Coach Notes / Kit Requirements</label>
+                        <input type="text" id="practice-input-notes" placeholder="e.g. Bring full training kit, boots & shinguards">
+                    </div>
+                    <button class="btn-primary w-100" style="margin-top: 12px;" onclick="savePracticeSchedule()">
+                        <i class="fa-solid fa-cloud-arrow-up"></i> Update & Broadcast Schedule
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add Player / User Modal -->
+        <div id="add-player-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Add New User</h2>
+                    <button class="close-btn" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>ID Number</label>
+                        <input type="text" id="new-player-id" placeholder="e.g. 101">
+                    </div>
+                    <div class="form-group">
+                        <label>Full Name</label>
+                        <input type="text" id="new-player-name" placeholder="e.g. Marcus Rashford">
+                    </div>
+                    <div class="form-group">
+                        <label>Date of Birth</label>
+                        <input type="text" onfocus="(this.type='date')" onblur="(this.value == '' ? this.type='text' : this.type='date')" id="new-player-dob" placeholder="Date of Birth" class="date-input">
+                    </div>
+                    <div class="form-group">
+                        <label>Email Address</label>
+                        <input type="email" id="new-player-email" placeholder="e.g. marcus@mufc.com">
+                    </div>
+                    <div class="form-group">
+                        <label>WhatsApp Number</label>
+                        <div class="input-group">
+                            <select id="new-player-country" class="form-select" style="flex: 1;">
+                                <option value="+91">+91 (IN)</option>
+                                <option value="+971">+971 (UAE)</option>
+                                <option value="+44">+44 (UK)</option>
+                                <option value="+966">+966 (KSA)</option>
+                            </select>
+                            <input type="tel" id="new-player-whatsapp" placeholder="e.g. 50 123 4567" style="flex: 2;">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Profile Picture</label>
+                        <input type="file" id="new-player-pic" accept="image/*" class="file-input">
+                    </div>
+                    <div class="form-group">
+                        <label>Password</label>
+                        <input type="text" id="new-player-pass" placeholder="e.g. pass123">
+                    </div>
+                    <div class="form-group">
+                        <label>Jersey Number</label>
+                        <input type="number" id="new-player-number" placeholder="e.g. 10">
+                    </div>
+                    <button class="btn-primary w-100" style="margin-top: 10px;" onclick="addPlayer()"><i class="fa-solid fa-check"></i> Save User</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- User Registration Details Modal -->
+        <div id="user-details-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Registration Details</h2>
+                    <button class="close-btn" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div class="modal-body" id="user-details-modal-body">
+                    <!-- Populated dynamically by JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Player Management Modal (Admin) -->
+        <div id="player-management-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Player Management</h2>
+                    <button class="close-btn" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div class="modal-body" id="player-management-modal-body">
+                    <!-- Populated dynamically by JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Edit Profile Modal -->
+        <div id="edit-profile-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Edit Profile</h2>
+                    <button class="close-btn" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>Profile Picture</label>
+                        <input type="file" id="edit-profile-pic" accept="image/*" class="file-input">
+                    </div>
+                    <div class="form-group">
+                        <label>Full Name</label>
+                        <input type="text" id="edit-profile-name" placeholder="Full Name">
+                    </div>
+                    <div class="form-group">
+                        <label>Email Address</label>
+                        <input type="email" id="edit-profile-email" placeholder="Email Address">
+                    </div>
+                    <div class="form-group">
+                        <label>WhatsApp Number</label>
+                        <div class="input-group">
+                            <select id="edit-profile-country" class="form-select" style="flex: 1;">
+                                <option value="+91">+91 (IN)</option>
+                                <option value="+971">+971 (UAE)</option>
+                                <option value="+44">+44 (UK)</option>
+                                <option value="+966">+966 (KSA)</option>
+                            </select>
+                            <input type="tel" id="edit-profile-whatsapp" placeholder="WhatsApp Number" style="flex: 2;">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Password</label>
+                        <input type="text" id="edit-profile-pass" placeholder="Password">
+                    </div>
+                    <button id="save-profile-btn" class="btn-primary w-100" style="margin-top: 10px;" onclick="saveProfile()"><i class="fa-solid fa-save"></i> Save Changes</button>
+                    <button id="logout-btn-profile" class="btn-secondary w-100" style="margin-top: 10px; border-color: #ef4444; color: #ef4444;" onclick="logout()"><i class="fa-solid fa-right-from-bracket"></i> Logout</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>
