@@ -1827,6 +1827,14 @@ function renderAcademyAttendance() {
     const searchQuery = searchInput ? searchInput.value.toLowerCase() : '';
     const filteredStudents = academyStudents.filter(s => s.name.toLowerCase().includes(searchQuery));
     
+    filteredStudents.sort((a, b) => {
+        let ageA = parseInt(a.age);
+        if (isNaN(ageA)) ageA = 999;
+        let ageB = parseInt(b.age);
+        if (isNaN(ageB)) ageB = 999;
+        return ageA - ageB;
+    });
+
     filteredStudents.forEach(student => {
         const record = getAcademyAttendanceForDate(dateStr, student.id);
         const isPresent = record && record.status === 'Present';
