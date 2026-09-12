@@ -1946,6 +1946,14 @@ function renderAcademyPayments() {
         return true;
     });
     
+    studentsToRender.sort((a, b) => {
+        let ageA = parseInt(a.age);
+        if (isNaN(ageA)) ageA = 999;
+        let ageB = parseInt(b.age);
+        if (isNaN(ageB)) ageB = 999;
+        return ageA - ageB;
+    });
+    
     if(studentsToRender.length === 0) {
         list.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 20px;">No students registered yet.</p>';
         return;
@@ -2180,7 +2188,15 @@ function renderAcademyReports() {
     
     let tbody = `<tbody>`;
     
-    const studentsToRender = academyStudents;
+    const studentsToRender = [...academyStudents];
+    
+    studentsToRender.sort((a, b) => {
+        let ageA = parseInt(a.age);
+        if (isNaN(ageA)) ageA = 999;
+        let ageB = parseInt(b.age);
+        if (isNaN(ageB)) ageB = 999;
+        return ageA - ageB;
+    });
     
     if(studentsToRender.length === 0) {
         tbody += `<tr><td colspan="${5 + activeDays.length}" style="padding: 20px; text-align: center; color: var(--text-muted);">No students registered.</td></tr>`;
