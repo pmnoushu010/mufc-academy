@@ -136,20 +136,26 @@ setInterval(async () => {
             // Re-render current active view to show changes from other users
             const activeView = document.querySelector('.view.active');
             if (activeView) {
-                const viewId = activeView.id.replace('view-', '');
-                if(viewId === 'admin-dashboard') renderAdminDashboard();
-                else if(viewId === 'admin-messages') renderAdminMessages();
-                else if(viewId === 'admin-approvals') renderPendingApprovals();
-                else if(viewId === 'admin-attendance') renderAdminAttendance();
-                else if(viewId === 'admin-players') renderPlayers();
-                else if(viewId === 'player-dashboard') renderPlayerDashboard();
-                else if(viewId === 'player-messages') renderPlayerChat();
-                else if(viewId === 'academy-admin') renderAcademyStudents();
-                else if(viewId === 'academy-attendance') renderAcademyAttendance();
-                else if(viewId === 'academy-payments') renderAcademyPayments();
-                else if(viewId === 'academy-reports') renderAcademyReports();
-                else if(viewId === 'academy-accounts') renderAcademyAccounts();
-                else if(viewId === 'academy-users') renderAcademyUsers();
+                // Prevent re-rendering if the user is currently typing in an input or textarea
+                const activeEl = document.activeElement;
+                const isTyping = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA');
+                
+                if (!isTyping) {
+                    const viewId = activeView.id.replace('view-', '');
+                    if(viewId === 'admin-dashboard') renderAdminDashboard();
+                    else if(viewId === 'admin-messages') renderAdminMessages();
+                    else if(viewId === 'admin-approvals') renderPendingApprovals();
+                    else if(viewId === 'admin-attendance') renderAdminAttendance();
+                    else if(viewId === 'admin-players') renderPlayers();
+                    else if(viewId === 'player-dashboard') renderPlayerDashboard();
+                    else if(viewId === 'player-messages') renderPlayerChat();
+                    else if(viewId === 'academy-admin') renderAcademyStudents();
+                    else if(viewId === 'academy-attendance') renderAcademyAttendance();
+                    else if(viewId === 'academy-payments') renderAcademyPayments();
+                    else if(viewId === 'academy-reports') renderAcademyReports();
+                    else if(viewId === 'academy-accounts') renderAcademyAccounts();
+                    else if(viewId === 'academy-users') renderAcademyUsers();
+                }
                 
                 // Also update chat if open
                 if (document.getElementById('admin-chat-view') && document.getElementById('admin-chat-view').style.display === 'block') {
@@ -1882,7 +1888,7 @@ function renderAcademyAttendance() {
                 ${student.role === 'coach' ? '' : `
                 <div style="display: flex; gap: 8px; align-items: center;">
                     <input type="number" id="attendance-fee-${student.id}" value="${amount}" placeholder="SAR" style="width: 80px; padding: 8px; border-radius: 8px; background: rgba(15, 23, 42, 0.8); color: white; border: 1px solid #374151; text-align: center; font-weight: bold; font-size: 0.85rem;" oninput="handleFeeInput(this, '${student.id}', '${monthStr}')">
-                    <button id="pay-btn-${student.id}" class="btn-primary" style="padding: 8px 12px; border-radius: 8px; font-size: 0.85rem; font-weight: bold; display: flex; align-items: center; gap: 6px; ${isPaid ? 'background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16,185,129,0.3); opacity: 1;' : (amount > 0 ? 'background: #3b82f6; color: white; border-color: #3b82f6; opacity: 1;' : 'background: #374151; color: #9ca3af; border-color: #374151; opacity: 0.5;')}" onclick="togglePaymentStatusFromAttendance('${student.id}', '${monthStr}')" ${(!isPaid && (!amount || amount <= 0)) || isPaid ? 'disabled' : ''}>
+                    <button id="pay-btn-${student.id}" class="btn-primary" style="padding: 8px 12px; border-radius: 8px; font-size: 0.85rem; font-weight: bold; display: flex; align-items: center; gap: 6px; ${isPaid ? 'background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16,185,129,0.3); opacity: 1;' : (amount > 0 ? 'background: #3b82f6; color: white; border: 1px solid #3b82f6; opacity: 1;' : 'background: #374151; color: #9ca3af; border: 1px solid #374151; opacity: 0.5;')}" onclick="togglePaymentStatusFromAttendance('${student.id}', '${monthStr}')" ${(!isPaid && (!amount || amount <= 0)) || isPaid ? 'disabled' : ''}>
                         <i class="fa-solid fa-wallet"></i> ${isPaid ? 'Paid' : 'Pay'}
                     </button>
                 </div>
@@ -2074,9 +2080,7 @@ function handleFeeInput(inputElem, studentId, monthStr) {
         payment.paid = 0;
         isPaid = false;
         saveData();
-        renderAcademyAttendance();
         if(document.getElementById('view-academy-accounts').classList.contains('active')) renderAcademyAccounts();
-        return;
     } else if (isPaid && amount > 0) {
         payment.amount = amount;
         payment.paid = amount;
@@ -2088,26 +2092,32 @@ function handleFeeInput(inputElem, studentId, monthStr) {
         const isPayActive = !isPaid && amount > 0;
         const isDisabled = (!isPaid && amount <= 0) || isPaid;
         
-        btn.disabled = isDisabled;
+        const currentState = btn.getAttribute('data-state');
+        let newState = isPaid ? 'paid' : (isPayActive ? 'active' : 'inactive');
         
-        if (isPaid) {
-            btn.innerHTML = `<i class="fa-solid fa-wallet"></i> Paid`;
-            btn.style.background = 'rgba(16, 185, 129, 0.15)';
-            btn.style.color = '#10b981';
-            btn.style.border = '1px solid rgba(16,185,129,0.3)';
-            btn.style.opacity = '1';
-        } else if (isPayActive) {
-            btn.innerHTML = `<i class="fa-solid fa-wallet"></i> Pay`;
-            btn.style.background = '#3b82f6';
-            btn.style.color = 'white';
-            btn.style.border = '1px solid #3b82f6';
-            btn.style.opacity = '1';
-        } else {
-            btn.innerHTML = `<i class="fa-solid fa-wallet"></i> Pay`;
-            btn.style.background = '#374151';
-            btn.style.color = '#9ca3af';
-            btn.style.border = '1px solid #374151';
-            btn.style.opacity = '0.5';
+        if (currentState !== newState) {
+            btn.setAttribute('data-state', newState);
+            btn.disabled = isDisabled;
+            
+            if (isPaid) {
+                btn.innerHTML = `<i class="fa-solid fa-wallet"></i> Paid`;
+                btn.style.background = 'rgba(16, 185, 129, 0.15)';
+                btn.style.color = '#10b981';
+                btn.style.border = '1px solid rgba(16,185,129,0.3)';
+                btn.style.opacity = '1';
+            } else if (isPayActive) {
+                btn.innerHTML = `<i class="fa-solid fa-wallet"></i> Pay`;
+                btn.style.background = '#3b82f6';
+                btn.style.color = 'white';
+                btn.style.border = '1px solid #3b82f6';
+                btn.style.opacity = '1';
+            } else {
+                btn.innerHTML = `<i class="fa-solid fa-wallet"></i> Pay`;
+                btn.style.background = '#374151';
+                btn.style.color = '#9ca3af';
+                btn.style.border = '1px solid #374151';
+                btn.style.opacity = '0.5';
+            }
         }
     }
 }
