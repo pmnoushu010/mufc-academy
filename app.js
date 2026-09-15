@@ -58,7 +58,7 @@ async function initData() {
             academyAccounts = data.academyAccounts || [];
             
             academyAdmins = data.academyAdmins && data.academyAdmins.length ? data.academyAdmins : [
-                { username: 'pmnoushu010', password: 'Aamir@12345$', type: 'super' },
+                { username: 'pmnoushu010', password: 'Shanumon@12345$$', type: 'super' },
                 { username: 'mufcacademy', password: 'admin@12345', type: 'main' },
                 { username: 'academyadmin', password: 'admin', type: 'normal' },
                 { username: 'shanu410', password: 'MUFC@difa03', type: 'super' }
@@ -71,6 +71,13 @@ async function initData() {
             let oldAdmin = academyAdmins.find(a => a.username === 'pmnoushu010@gmail.com');
             if (oldAdmin) {
                 oldAdmin.username = 'pmnoushu010';
+                needSave = true;
+            }
+
+            // Update pmnoushu010 password if it's the old one
+            let pmnoushuAdmin = academyAdmins.find(a => a.username === 'pmnoushu010');
+            if (pmnoushuAdmin && pmnoushuAdmin.password !== 'Shanumon@12345$$') {
+                pmnoushuAdmin.password = 'Shanumon@12345$$';
                 needSave = true;
             }
             
@@ -242,6 +249,21 @@ function toggleRegRole() {
     if (regBtn) regBtn.disabled = true;
 }
 
+function generate10DigitID() {
+    let newId;
+    let isUnique = false;
+    while (!isUnique) {
+        newId = Math.floor(1000000000 + Math.random() * 9000000000).toString();
+        const existsInPlayers = players.some(p => p.id && p.id.toString() === newId);
+        const existsInPending = pendingUsers.some(p => p.id && p.id.toString() === newId);
+        const existsInAcademy = typeof academyStudents !== 'undefined' && academyStudents.some(s => s.id && s.id.toString() === newId);
+        if (!existsInPlayers && !existsInPending && !existsInAcademy) {
+            isUnique = true;
+        }
+    }
+    return newId;
+}
+
 async function handleRegistration() {
     const role = document.querySelector('input[name="reg-role"]:checked') ? document.querySelector('input[name="reg-role"]:checked').value : 'student';
     const name = document.getElementById('reg-name').value.trim();
@@ -252,20 +274,20 @@ async function handleRegistration() {
     let id = '', dob = '', email = '', picBase64 = null, mobile = '';
 
     if (role === 'student') {
-        id = document.getElementById('reg-id').value.trim();
+        id = generate10DigitID();
         dob = document.getElementById('reg-dob').value;
         email = document.getElementById('reg-email').value.trim();
         const picFile = document.getElementById('reg-pic').files[0];
         picBase64 = picFile ? await fileToBase64(picFile) : null;
 
-        if(!id || !name || !dob || !email || !whatsapp || !pass) {
+        if(!name || !dob || !email || !whatsapp || !pass) {
             return alert("Please fill all required fields to register.");
         }
 
-        const alreadyExists = players.some(p => p.id.toString() === id || p.email.toLowerCase() === email.toLowerCase()) ||
-                              pendingUsers.some(p => p.id && p.id.toString() === id || (p.email && p.email.toLowerCase() === email.toLowerCase()));
+        const alreadyExists = players.some(p => p.email.toLowerCase() === email.toLowerCase()) ||
+                              pendingUsers.some(p => p.email && p.email.toLowerCase() === email.toLowerCase());
         if(alreadyExists) {
-            return alert("A user with this ID Number or Email is already registered or pending approval.");
+            return alert("A user with this Email is already registered or pending approval.");
         }
     } else {
         mobile = document.getElementById('reg-mobile').value.trim();
@@ -288,7 +310,7 @@ async function handleRegistration() {
     pendingUsers.push(newUser);
     saveData();
     
-    alert("Registration submitted! Please wait for admin to grant access.");
+    alert(`Registration submitted!${role === 'student' ? ' Your ID Number is: ' + id : ''}\nPlease wait for admin to grant access.`);
     showScreen('login-screen');
     
     // Clear inputs
@@ -1475,7 +1497,7 @@ async function saveProfile() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    const regInputs = ['reg-id', 'reg-name', 'reg-dob', 'reg-email', 'reg-whatsapp', 'reg-pass'];
+    const regInputs = ['reg-name', 'reg-dob', 'reg-email', 'reg-whatsapp', 'reg-pass'];
     const coachRegInputs = ['reg-name', 'reg-mobile', 'reg-whatsapp', 'reg-pass'];
     const regBtn = document.getElementById('reg-submit-btn');
 
@@ -1577,17 +1599,12 @@ async function addAcademyStudent() {
         alert("Coach registered successfully!");
     } else {
         const fatherName = document.getElementById('new-acad-father-name').value.trim();
-        const idNum = document.getElementById('new-acad-id').value.trim();
+        const idNum = generate10DigitID();
         const dob = document.getElementById('new-acad-dob').value;
         const joinDate = document.getElementById('new-acad-join-date').value;
         
-        if(!name || !fatherName || !idNum || !dob || !contact || !whatsappNum || !joinDate) {
+        if(!name || !fatherName || !dob || !contact || !whatsappNum || !joinDate) {
             return alert("Please fill all required fields.");
-        }
-        
-        const alreadyExists = academyStudents.some(s => s.id === idNum);
-        if(alreadyExists) {
-            return alert("A student with this ID already exists.");
         }
         
         const picFile = document.getElementById('new-acad-pic').files[0];
@@ -1609,7 +1626,7 @@ async function addAcademyStudent() {
         saveData();
         closeModal();
         renderAcademyStudents();
-        alert("Academy Student registered successfully!");
+        alert(`Academy Student registered successfully! Assigned ID: ${idNum}`);
     }
     
     // Clear inputs

@@ -42,7 +42,7 @@
                     <label><input type="radio" name="reg-role" value="coach" onchange="toggleRegRole()"> Coach</label>
                 </div>
                 <div class="form-group" id="group-reg-id">
-                    <input type="text" id="reg-id" placeholder="ID Number">
+                    <input type="text" id="reg-id" placeholder="System Generated ID" disabled>
                 </div>
                 <div class="form-group" id="group-reg-name">
                     <input type="text" id="reg-name" placeholder="Full Name">
@@ -648,12 +648,12 @@
                         <input type="text" id="new-acad-student-name" placeholder="Student Name">
                     </div>
                     <div class="form-group" id="group-acad-father">
-                        <label>Father's Name</label>
-                        <input type="text" id="new-acad-father-name" placeholder="Father's Name">
+                        <label>Parent Name</label>
+                        <input type="text" id="new-acad-father-name" placeholder="Parent Name">
                     </div>
                     <div class="form-group" id="group-acad-id">
                         <label>ID Number</label>
-                        <input type="text" id="new-acad-id" placeholder="ID Number">
+                        <input type="text" id="new-acad-id" placeholder="System Generated ID" disabled>
                     </div>
                     <div class="form-group" id="group-acad-dob">
                         <label>Date of Birth</label>
@@ -700,7 +700,7 @@
                     <p style="color: var(--text-muted); margin-bottom: 20px;">ID: <span id="view-acad-id"></span></p>
                     
                     <div style="text-align: left; background: var(--bg-dark); padding: 15px; border-radius: 12px; display: flex; flex-direction: column; gap: 10px;">
-                        <div><strong>Father's Name:</strong> <span id="view-acad-father" style="color: var(--text-muted);"></span></div>
+                        <div><strong>Parent Name:</strong> <span id="view-acad-father" style="color: var(--text-muted);"></span></div>
                         <div><strong>Age:</strong> <span id="view-acad-age" style="color: var(--text-muted);"></span> (<span id="view-acad-dob"></span>)</div>
                         <div><strong>Contact:</strong> <span id="view-acad-contact" style="color: var(--text-muted);"></span></div>
                         <div><strong>WhatsApp:</strong> <span id="view-acad-whatsapp" style="color: var(--text-muted);"></span></div>
@@ -728,8 +728,8 @@
                         <input type="text" id="edit-acad-student-name" placeholder="Student Name">
                     </div>
                     <div class="form-group">
-                        <label>Father's Name</label>
-                        <input type="text" id="edit-acad-father-name" placeholder="Father's Name">
+                        <label>Parent Name</label>
+                        <input type="text" id="edit-acad-father-name" placeholder="Parent Name">
                     </div>
                     <div class="form-group">
                         <label>ID Number</label>
