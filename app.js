@@ -1658,7 +1658,7 @@ function renderAcademyStudents() {
                 <div class="profile-pic" style="${student.pic ? `background-image: url('${student.pic}');` : ''}"></div>
                 <div>
                     <h3 style="font-size: 1.1rem; color: ${student.role === 'coach' ? '#3b82f6' : '#fff'};">${escapeHtml(student.name)} ${student.role === 'coach' ? '<span style="font-size: 0.75rem; background: rgba(59,130,246,0.2); color: #3b82f6; padding: 2px 6px; border-radius: 4px; margin-left: 6px; vertical-align: middle;">Coach</span>' : ''}</h3>
-                    <p style="font-size: 0.85rem; color: var(--text-muted);">Total Attended: ${totalAttended} Days</p>
+                    <p style="font-size: 0.85rem; color: var(--text-muted);">ID: ${escapeHtml(student.id)} ${student.role !== 'coach' ? `| Parent: ${escapeHtml(student.fatherName || 'N/A')}` : ''} | Total Attended: ${totalAttended} Days</p>
                 </div>
             </div>
         `;
@@ -1884,7 +1884,7 @@ function renderAcademyAttendance() {
                 <div class="profile-pic" style="min-width: 45px; height: 45px; ${student.pic ? `background-image: url('${student.pic}');` : ''}"></div>
                 <div style="overflow: hidden;">
                     <h3 style="font-size: 1.1rem; color: ${nameColor}; white-space: nowrap; text-overflow: ellipsis; overflow: hidden;">${escapeHtml(student.name)} ${student.role === 'coach' ? '<span style="font-size: 0.75rem; background: rgba(59,130,246,0.2); color: #3b82f6; padding: 2px 6px; border-radius: 4px; margin-left: 4px; vertical-align: middle;">Coach</span>' : (student.age && student.age !== '-' ? `<span style="font-size: 0.85rem; color: var(--text-muted); font-weight: normal; margin-left: 4px;">(${student.age} Yrs)</span>` : '')} ${isPaid ? '<i class="fa-solid fa-circle-check" style="font-size: 0.85rem; margin-left: 4px;"></i>' : ''}</h3>
-                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 2px;">ID: ${escapeHtml(student.id)}</p>
+                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 2px;">ID: ${escapeHtml(student.id)} ${student.role !== 'coach' ? `| Parent: ${escapeHtml(student.fatherName || 'N/A')}` : ''}</p>
                 </div>
             </div>
             
@@ -2022,7 +2022,7 @@ function renderAcademyPayments() {
                 <div class="profile-pic" style="min-width: 45px; height: 45px; ${student.pic ? `background-image: url('${student.pic}');` : ''}"></div>
                 <div style="overflow: hidden;">
                     <h3 style="font-size: 1.1rem; color: ${hasAttended ? (isPaid ? '#10b981' : '#ef4444') : '#fff'}; white-space: nowrap; text-overflow: ellipsis; overflow: hidden;">${escapeHtml(student.name)} ${student.age ? `<span style="font-size: 0.85rem; color: var(--text-muted); font-weight: normal; margin-left: 4px;">(${student.age} Yrs)</span>` : ''}</h3>
-                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 2px;">ID: ${escapeHtml(student.id)}</p>
+                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 2px;">ID: ${escapeHtml(student.id)} | Parent: ${escapeHtml(student.fatherName || 'N/A')}</p>
                 </div>
             </div>
             
@@ -2259,7 +2259,7 @@ function renderAcademyReports() {
             
             tbody += `
                 <tr style="border-bottom: 1px solid #374151;">
-                    <td style="padding: 12px; color: ${student.role === 'coach' ? '#3b82f6' : 'inherit'}; font-weight: ${student.role === 'coach' ? 'bold' : 'normal'};">${escapeHtml(student.name)} ${student.role === 'coach' ? '<span style="font-size: 0.75rem; background: rgba(59,130,246,0.2); color: #3b82f6; padding: 2px 6px; border-radius: 4px; margin-left: 4px; vertical-align: middle;">Coach</span>' : ''}</td>
+                    <td style="padding: 12px; color: ${student.role === 'coach' ? '#3b82f6' : 'inherit'}; font-weight: ${student.role === 'coach' ? 'bold' : 'normal'};">${escapeHtml(student.name)} ${student.role === 'coach' ? '<span style="font-size: 0.75rem; background: rgba(59,130,246,0.2); color: #3b82f6; padding: 2px 6px; border-radius: 4px; margin-left: 4px; vertical-align: middle;">Coach</span>' : `<br><span style="font-size: 0.75rem; color: #9ca3af;">Parent: ${escapeHtml(student.fatherName || 'N/A')}</span>`}</td>
                     <td style="padding: 12px;">${escapeHtml(student.id)}</td>
                     <td style="padding: 12px; text-align: center; color: #10b981;">${totalPresent}</td>
                     <td style="padding: 12px; text-align: center; color: #ef4444;">${totalAbsent}</td>
