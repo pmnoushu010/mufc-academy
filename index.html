@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body>
     <div id="desktop-app-container">
@@ -779,6 +780,24 @@
                 </div>
                 <div class="modal-body" style="max-height: 70vh; overflow-y: auto; padding-right: 5px;" id="attendance-history-list">
                     <!-- Populated dynamically -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Student Report History Modal -->
+        <div id="student-report-history-modal" class="modal">
+            <div class="modal-content" style="max-width: 600px;">
+                <div class="modal-header">
+                    <h2 id="student-report-history-title">Complete History</h2>
+                    <button class="close-btn" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div class="modal-body" style="max-height: 70vh; overflow-y: auto; padding-right: 5px;">
+                    <div id="student-report-history-content">
+                        <!-- Populated dynamically -->
+                    </div>
+                    <div style="margin-top: 20px; text-align: center;" id="student-report-history-whatsapp-container">
+                        <!-- Populated dynamically -->
+                    </div>
                 </div>
             </div>
         </div>

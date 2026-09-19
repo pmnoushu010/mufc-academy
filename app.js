@@ -2202,7 +2202,6 @@ function renderAcademyReports() {
         <thead>
             <tr style="border-bottom: 2px solid #374151; background: rgba(15, 23, 42, 0.5);">
                 <th style="padding: 12px; font-weight: 600;">Student Name</th>
-                <th style="padding: 12px; font-weight: 600;">ID</th>
                 <th style="padding: 12px; font-weight: 600; text-align: center;">Total Present</th>
                 <th style="padding: 12px; font-weight: 600; text-align: center;">Total Absent</th>
                 <th style="padding: 12px; font-weight: 600; text-align: center;">Payment</th>
@@ -2259,8 +2258,12 @@ function renderAcademyReports() {
             
             tbody += `
                 <tr style="border-bottom: 1px solid #374151;">
-                    <td style="padding: 12px; color: ${student.role === 'coach' ? '#3b82f6' : 'inherit'}; font-weight: ${student.role === 'coach' ? 'bold' : 'normal'};">${escapeHtml(student.name)} ${student.role === 'coach' ? '<span style="font-size: 0.75rem; background: rgba(59,130,246,0.2); color: #3b82f6; padding: 2px 6px; border-radius: 4px; margin-left: 4px; vertical-align: middle;">Coach</span>' : `<br><span style="font-size: 0.75rem; color: #9ca3af;">Parent: ${escapeHtml(student.fatherName || 'N/A')}</span>`}</td>
-                    <td style="padding: 12px;">${escapeHtml(student.id)}</td>
+                    <td style="padding: 12px; color: ${student.role === 'coach' ? '#3b82f6' : 'inherit'}; font-weight: ${student.role === 'coach' ? 'bold' : 'normal'};">
+                        <a href="#" onclick="viewStudentReportHistory('${student.id}'); return false;" style="color: inherit; text-decoration: underline;">
+                            ${escapeHtml(student.name)}
+                        </a>
+                        ${student.role === 'coach' ? '<span style="font-size: 0.75rem; background: rgba(59,130,246,0.2); color: #3b82f6; padding: 2px 6px; border-radius: 4px; margin-left: 4px; vertical-align: middle;">Coach</span>' : `<br><span style="font-size: 0.75rem; color: #9ca3af;">Parent: ${escapeHtml(student.fatherName || 'N/A')}</span>`}
+                    </td>
                     <td style="padding: 12px; text-align: center; color: #10b981;">${totalPresent}</td>
                     <td style="padding: 12px; text-align: center; color: #ef4444;">${totalAbsent}</td>
                     <td style="padding: 12px; text-align: center;">${payText}</td>
@@ -2287,6 +2290,107 @@ function exportAcademyReportToExcel() {
     
     const wb = XLSX.utils.table_to_book(table, {sheet: "Academy Report"});
     XLSX.writeFile(wb, `MUFC_Academy_Report_${monthStr}.xlsx`);
+}
+
+function viewStudentReportHistory(studentId) {
+    const student = academyStudents.find(s => s.id === studentId);
+    if (!student) return;
+
+    // Collect all unique months from attendance and payments
+    const uniqueMonths = new Set();
+    
+    academyPayments.filter(p => p.studentId === studentId).forEach(p => uniqueMonths.add(p.month));
+    
+    academyAttendance.filter(a => a.studentId === studentId).forEach(a => {
+        const dateParts = a.date.split('-');
+        if (dateParts.length >= 2) {
+            uniqueMonths.add(`${dateParts[0]}-${dateParts[1]}`);
+        }
+    });
+
+    const sortedMonths = Array.from(uniqueMonths).sort();
+    
+    let html = '';
+    let whatsappText = `*Complete History for ${student.name}*\n\n`;
+
+    if (sortedMonths.length === 0) {
+        html = '<p style="text-align: center; color: var(--text-muted); padding: 20px;">No history found for this student.</p>';
+        whatsappText += 'No history found.';
+    } else {
+        sortedMonths.forEach(month => {
+            // Get Payment
+            const payment = academyPayments.find(p => p.studentId === studentId && p.month === month);
+            const isPaid = payment && payment.status === 'Paid';
+            const paymentStatusText = student.role === 'coach' ? 'N/A' : (isPaid ? `Paid (${payment.amount})` : 'Unpaid');
+            
+            // Get Attendance
+            let totalPresent = 0;
+            let totalAbsent = 0;
+            academyAttendance.filter(a => a.studentId === studentId && a.date.startsWith(month)).forEach(a => {
+                if (a.status === 'Present') totalPresent++;
+                if (a.status === 'Absent') totalAbsent++;
+            });
+
+            html += `
+                <div style="background: rgba(15, 23, 42, 0.4); border: 1px solid #374151; border-radius: 8px; padding: 15px; margin-bottom: 10px;">
+                    <h4 style="margin-top: 0; margin-bottom: 10px; color: var(--primary); font-size: 1.1rem;">${month}</h4>
+                    <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+                        <div style="flex: 1; min-width: 150px;">
+                            <p style="margin: 0; font-size: 0.9rem; color: #9ca3af;">Payment Status</p>
+                            <p style="margin: 5px 0 0 0; font-weight: bold; color: ${student.role === 'coach' ? '#9ca3af' : (isPaid ? '#10b981' : '#ef4444')};">${paymentStatusText}</p>
+                        </div>
+                        <div style="flex: 1; min-width: 150px;">
+                            <p style="margin: 0; font-size: 0.9rem; color: #9ca3af;">Attendance</p>
+                            <p style="margin: 5px 0 0 0; font-weight: bold;">
+                                <span style="color: #10b981;">${totalPresent} Present</span> / 
+                                <span style="color: #ef4444;">${totalAbsent} Absent</span>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            whatsappText += `*Month:* ${month}\n`;
+            whatsappText += `*Payment:* ${paymentStatusText}\n`;
+            whatsappText += `*Attendance:* ${totalPresent} Present / ${totalAbsent} Absent\n\n`;
+        });
+    }
+
+    document.getElementById('student-report-history-title').textContent = `Complete History - ${student.name}`;
+    document.getElementById('student-report-history-content').innerHTML = html;
+    
+    const whatsappContainer = document.getElementById('student-report-history-whatsapp-container');
+    whatsappContainer.innerHTML = '';
+    
+    // Screenshot Button
+    const screenshotBtn = document.createElement('button');
+    screenshotBtn.className = 'btn-secondary';
+    screenshotBtn.style.cssText = 'display: inline-flex; align-items: center; gap: 6px; margin-right: 10px;';
+    screenshotBtn.innerHTML = '<i class="fa-solid fa-camera"></i> Save Screenshot';
+    screenshotBtn.onclick = () => {
+        const content = document.getElementById('student-report-history-content');
+        html2canvas(content, { backgroundColor: '#0f172a' }).then(canvas => {
+            const link = document.createElement('a');
+            link.download = `MUFC_Report_${student.name.replace(/\s+/g, '_')}.png`;
+            link.href = canvas.toDataURL();
+            link.click();
+        });
+    };
+    whatsappContainer.appendChild(screenshotBtn);
+
+    if (student.whatsapp) {
+        const phone = student.whatsapp.replace(/\D/g, '');
+        const encodedText = encodeURIComponent(whatsappText.trim());
+        const waLink = document.createElement('a');
+        waLink.href = `https://wa.me/${phone}?text=${encodedText}`;
+        waLink.target = '_blank';
+        waLink.className = 'btn-primary';
+        waLink.style.cssText = 'display: inline-flex; align-items: center; background: #25D366; border-color: #25D366; color: white; text-decoration: none; padding: 8px 15px; border-radius: 8px; font-size: 0.85rem; font-weight: bold; gap: 6px; transition: 0.2s;';
+        waLink.innerHTML = '<i class="fa-brands fa-whatsapp" style="font-size: 1.1rem;"></i> Share via WhatsApp';
+        whatsappContainer.appendChild(waLink);
+    }
+
+    document.getElementById('student-report-history-modal').classList.add('active');
 }
 
 // ================= ACADEMY ACCOUNTS LOGIC =================
