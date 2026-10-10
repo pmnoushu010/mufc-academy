@@ -396,6 +396,8 @@ function performLogin(role, user) {
         document.querySelectorAll('#academy-nav .nav-item').forEach(item => {
             if (item.getAttribute('onclick').includes('academy-users')) {
                 item.style.display = (user && user.type === 'super') ? 'flex' : 'none';
+            } else if (item.getAttribute('onclick').includes('academy-dashboard')) {
+                item.style.display = (user && user.type === 'super') ? 'flex' : 'none';
             } else if (item.getAttribute('onclick').includes('academy-pnl')) {
                 item.style.display = (user && user.type === 'super') ? 'flex' : 'none';
             } else if (item.getAttribute('onclick').includes('academy-approvals')) {
@@ -479,6 +481,8 @@ function switchView(viewId, event) {
         renderPlayerDashboard();
     } else if(viewId === 'player-messages') {
         renderPlayerChat();
+    } else if(viewId === 'academy-dashboard') {
+        renderAcademyDashboard();
     } else if(viewId === 'academy-admin') {
         renderAcademyStudents();
     } else if(viewId === 'academy-attendance') {
@@ -1880,6 +1884,23 @@ function renderAcademyAttendance() {
     
     let presentCount = 0;
     
+    // Calculate total collected for this specific date
+    let todayCollected = 0;
+    academyPayments.forEach(p => {
+        if (p.history) {
+            p.history.forEach(h => {
+                if (h.date === dateStr) {
+                    todayCollected += parseFloat(h.amount) || 0;
+                }
+            });
+        } else if (p.status === 'Paid') {
+            // Fallback for older payments if we assume they were paid on the 1st of the month
+            // or just ignore them since we just wiped data anyway.
+        }
+    });
+    const collectedEl = document.getElementById('academy-today-collected');
+    if(collectedEl) collectedEl.innerText = todayCollected;
+    
     const searchInput = document.getElementById('academy-attendance-search');
     const searchQuery = searchInput ? searchInput.value.toLowerCase() : '';
     const filteredStudents = academyStudents.filter(s => s.name.toLowerCase().includes(searchQuery));
@@ -2202,12 +2223,17 @@ function togglePaymentStatusFromAttendance(studentId, monthStr) {
     
     if (amount <= 0) return;
     
+    const datePicker = document.getElementById('academy-attendance-date');
+    const exactDate = datePicker && datePicker.value ? datePicker.value : new Date().toISOString().split('T')[0];
+    
     let payment = getAcademyPaymentForMonth(monthStr, studentId);
     if(payment) {
         if (payment.status !== 'Paid') {
             payment.status = 'Paid';
             payment.amount = amount;
             payment.paid = amount;
+            if (!payment.history) payment.history = [];
+            payment.history.push({ date: exactDate, amount: amount });
         }
     } else {
         academyPayments.push({
@@ -2215,7 +2241,8 @@ function togglePaymentStatusFromAttendance(studentId, monthStr) {
             studentId: studentId,
             amount: amount,
             paid: amount,
-            status: 'Paid'
+            status: 'Paid',
+            history: [{ date: exactDate, amount: amount }]
         });
     }
     saveData();
@@ -2226,6 +2253,8 @@ function togglePaymentStatusFromAttendance(studentId, monthStr) {
 function payOutstanding(studentId, monthStr, outstandingAmount) {
     if (!confirm(`Confirm paying outstanding balance of ${outstandingAmount} SAR?`)) return;
     
+    const exactDate = new Date().toISOString().split('T')[0];
+    
     let payment = getAcademyPaymentForMonth(monthStr, studentId);
     if (!payment) {
         academyPayments.push({
@@ -2233,7 +2262,8 @@ function payOutstanding(studentId, monthStr, outstandingAmount) {
             studentId: studentId,
             amount: outstandingAmount,
             paid: outstandingAmount,
-            status: 'Paid'
+            status: 'Paid',
+            history: [{ date: exactDate, amount: outstandingAmount }]
         });
     } else {
         const currentAmount = parseFloat(payment.amount) || parseFloat(payment.paid) || 0;
@@ -2241,6 +2271,8 @@ function payOutstanding(studentId, monthStr, outstandingAmount) {
         payment.amount = newTotal;
         payment.paid = newTotal;
         payment.status = 'Paid';
+        if (!payment.history) payment.history = [];
+        payment.history.push({ date: exactDate, amount: outstandingAmount });
     }
     
     saveData();
@@ -2958,5 +2990,119 @@ function rejectDeletion(id) {
         renderAcademyApprovals();
         renderAcademyStudents();
         alert("Deletion request rejected. The student has been restored.");
+    }
+}
+
+let chartPnL = null;
+let chartAge = null;
+let chartAttendance = null;
+
+function renderAcademyDashboard() {
+    if (chartPnL) chartPnL.destroy();
+    if (chartAge) chartAge.destroy();
+    if (chartAttendance) chartAttendance.destroy();
+    
+    // 1. P&L Current Month Pie Chart
+    const today = new Date();
+    const monthStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+    
+    let totalIncome = 0;
+    let totalExpense = 0;
+    academyPayments.forEach(p => {
+        if(p.month === monthStr && p.status === 'Paid') {
+            totalIncome += parseFloat(p.amount) || 0;
+        }
+    });
+    academyAccounts.forEach(acc => {
+        if(acc.date.startsWith(monthStr)) {
+            if(acc.type === 'Income' || acc.type === 'income') totalIncome += parseFloat(acc.amount) || 0;
+            if(acc.type === 'Expense' || acc.type === 'expense') totalExpense += parseFloat(acc.amount) || 0;
+        }
+    });
+    
+    const ctxPnL = document.getElementById('chart-pnl');
+    if(ctxPnL) {
+        chartPnL = new Chart(ctxPnL, {
+            type: 'pie',
+            data: {
+                labels: ['Income', 'Expense'],
+                datasets: [{
+                    data: [totalIncome, totalExpense],
+                    backgroundColor: ['#10b981', '#ef4444'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                plugins: { legend: { labels: { color: '#fff' } } }
+            }
+        });
+    }
+
+    // 2. Age Distribution (Bar chart)
+    const ageCounts = {};
+    academyStudents.forEach(s => {
+        const age = s.age && s.age !== '-' ? parseInt(s.age) : 'Unknown';
+        if(s.role !== 'coach') {
+            ageCounts[age] = (ageCounts[age] || 0) + 1;
+        }
+    });
+    const sortedAges = Object.keys(ageCounts).sort((a,b) => (a==='Unknown'?999:parseInt(a)) - (b==='Unknown'?999:parseInt(b)));
+    const ageLabels = sortedAges.map(a => a === 'Unknown' ? 'Unknown' : a + ' Yrs');
+    const ageData = sortedAges.map(a => ageCounts[a]);
+
+    const ctxAge = document.getElementById('chart-age');
+    if(ctxAge) {
+        chartAge = new Chart(ctxAge, {
+            type: 'bar',
+            data: {
+                labels: ageLabels,
+                datasets: [{
+                    label: 'Students',
+                    data: ageData,
+                    backgroundColor: '#38bdf8'
+                }]
+            },
+            options: {
+                scales: {
+                    y: { beginAtZero: true, ticks: { color: '#9ca3af', stepSize: 1, precision: 0 } },
+                    x: { ticks: { color: '#9ca3af' } }
+                },
+                plugins: { legend: { display: false } }
+            }
+        });
+    }
+
+    // 3. Attendance History (Bar chart)
+    const dateStats = {};
+    academyAttendance.forEach(a => {
+        if(a.status === 'Present') {
+            dateStats[a.date] = (dateStats[a.date] || 0) + 1;
+        }
+    });
+    let attDates = Object.keys(dateStats).sort();
+    if(attDates.length > 14) attDates = attDates.slice(-14);
+    
+    const attData = attDates.map(d => dateStats[d]);
+    
+    const ctxAtt = document.getElementById('chart-attendance');
+    if(ctxAtt) {
+        chartAttendance = new Chart(ctxAtt, {
+            type: 'bar',
+            data: {
+                labels: attDates,
+                datasets: [{
+                    label: 'Total Present',
+                    data: attData,
+                    backgroundColor: '#10b981'
+                }]
+            },
+            options: {
+                scales: {
+                    y: { beginAtZero: true, ticks: { color: '#9ca3af', stepSize: 1, precision: 0 } },
+                    x: { ticks: { color: '#9ca3af' } }
+                },
+                plugins: { legend: { display: false } }
+            }
+        });
     }
 }
