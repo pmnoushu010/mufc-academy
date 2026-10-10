@@ -144,6 +144,9 @@
                     <a href="#" class="nav-item" id="nav-pnl" style="display: none;" onclick="switchView('academy-pnl', event)">
                         <i class="fa-solid fa-chart-pie"></i><span>Profit & Loss</span>
                     </a>
+                    <a href="#" class="nav-item" id="nav-approvals" style="display: none;" onclick="switchView('academy-approvals', event)">
+                        <i class="fa-solid fa-check-to-slot"></i><span>Approvals</span>
+                    </a>
                     <a href="#" class="nav-item" onclick="switchView('academy-users', event)">
                         <i class="fa-solid fa-user-shield"></i><span>Users</span>
                     </a>
@@ -600,6 +603,16 @@
                         <div style="display: flex; flex-direction: column; gap: 10px;" id="pnl-breakdown">
                             <!-- Populated dynamically -->
                         </div>
+                    </div>
+                </section>
+
+                <section id="view-academy-approvals" class="view">
+                    <div class="view-header" style="margin-bottom: 20px;">
+                        <h2>Pending Approvals</h2>
+                        <p style="font-size: 0.8rem; color: var(--text-muted);">Approve or reject deletion requests (Super Admin Only)</p>
+                    </div>
+                    <div id="academy-approvals-list" class="player-list">
+                        <!-- Populated dynamically -->
                     </div>
                 </section>
 

@@ -398,6 +398,8 @@ function performLogin(role, user) {
                 item.style.display = (user && user.type === 'super') ? 'flex' : 'none';
             } else if (item.getAttribute('onclick').includes('academy-pnl')) {
                 item.style.display = (user && user.type === 'super') ? 'flex' : 'none';
+            } else if (item.getAttribute('onclick').includes('academy-approvals')) {
+                item.style.display = (user && user.type === 'super') ? 'flex' : 'none';
             } else if (item.getAttribute('onclick').includes('academy-accounts')) {
                 item.style.display = (user && (user.type === 'main' || user.type === 'super')) ? 'flex' : 'none';
             } else {
@@ -491,6 +493,8 @@ function switchView(viewId, event) {
         renderAcademyUsers();
     } else if(viewId === 'academy-pnl') {
         renderPnL();
+    } else if(viewId === 'academy-approvals') {
+        renderAcademyApprovals();
     }
 }
 
@@ -1661,7 +1665,7 @@ function renderAcademyStudents() {
             <div class="player-info">
                 <div class="profile-pic" style="${student.pic ? `background-image: url('${student.pic}');` : ''}"></div>
                 <div>
-                    <h3 style="font-size: 1.1rem; color: ${student.role === 'coach' ? '#3b82f6' : '#fff'};">${escapeHtml(student.name)} ${student.role === 'coach' ? '<span style="font-size: 0.75rem; background: rgba(59,130,246,0.2); color: #3b82f6; padding: 2px 6px; border-radius: 4px; margin-left: 6px; vertical-align: middle;">Coach</span>' : ''}</h3>
+                    <h3 style="font-size: 1.1rem; color: ${student.role === 'coach' ? '#3b82f6' : (student.gender === 'Female' ? '#ec4899' : '#fff')};">${escapeHtml(student.name)} ${student.role === 'coach' ? '<span style="font-size: 0.75rem; background: rgba(59,130,246,0.2); color: #3b82f6; padding: 2px 6px; border-radius: 4px; margin-left: 6px; vertical-align: middle;">Coach</span>' : ''} ${student.pendingDeletion ? '<span style="font-size: 0.75rem; background: rgba(239, 68, 68, 0.2); color: #ef4444; padding: 2px 6px; border-radius: 4px; margin-left: 6px; vertical-align: middle;">Pending Deletion</span>' : ''}</h3>
                     <p style="font-size: 0.85rem; color: var(--text-muted);">ID: ${escapeHtml(student.id)} ${student.role !== 'coach' ? `| Parent: ${escapeHtml(student.fatherName || 'N/A')}` : ''} | Total Attended: ${totalAttended} Days</p>
                 </div>
             </div>
@@ -1775,15 +1779,26 @@ async function deleteAcademyStudent() {
     const student = academyStudents.find(s => s.id === currentAcademyStudentId);
     if (!student) return;
 
+    if (currentUser.type !== 'super') {
+        if (confirm(`You do not have permission to delete this student directly. Do you want to request deletion approval from the Super Admin?`)) {
+            student.pendingDeletion = true;
+            student.pendingDeletionBy = currentUser.username || currentUser.id;
+            saveData();
+            closeModal();
+            renderAcademyStudents();
+            alert("Deletion request sent to Super Admin.");
+        }
+        return;
+    }
+
     if (confirm(`Are you sure you want to delete ${student.name}? This cannot be undone.`)) {
         academyStudents = academyStudents.filter(s => s.id !== currentAcademyStudentId);
-        await saveData();
+        saveData();
         closeModal();
         renderAcademyStudents();
         renderAcademyReports();
     }
 }
-
 function openAttendanceHistoryModal() {
     const list = document.getElementById('attendance-history-list');
     list.innerHTML = '';
@@ -2004,12 +2019,17 @@ function renderAcademyPayments() {
 
         let messageText = '';
         const addressee = student.fatherName || 'Parent';
+        const amountPaid = payment ? (parseFloat(payment.amount) || parseFloat(payment.paid) || 0) : 0;
+
         if (!hasAttended) {
             messageText = `Your child, ${student.name}, was absent for the month of ${readableMonth}. We hope he is doing well.\n\nIf there is anything you'd like to discuss or share with us, please feel free to reach out to us.\n\nSincere regards,\nMUFC Soccer Academy`;
+        } else if (isPaid && amountPaid > 0 && amountPaid < 150) {
+            const remaining = 150 - amountPaid;
+            messageText = `Dear ${addressee},\n\nThis is a reminder that we have received a partial payment of ${amountPaid} SAR for the academy fee of ${readableMonth} for your child, ${student.name}.\n\nThe remaining balance is ${remaining} SAR. Please arrange to complete the payment at your earliest convenience. Thank you!\n\nBest regards,\nMUFC Academy`;
         } else if (isPaid) {
-            messageText = `Dear ${addressee},\n\nWe are pleased to confirm that we have received the academy fee payment for ${readableMonth} for your child, ${student.name}.\n\nThank you for your prompt payment!\n\nBest regards,\nMUFC Academy`;
+            messageText = `Dear ${addressee},\n\nWe have successfully received the academy fee payment of ${amountPaid} SAR for ${readableMonth} for your child, ${student.name}.\n\nThank you for your prompt payment!\n\nBest regards,\nMUFC Academy`;
         } else {
-            messageText = `Dear ${addressee},\n\nThis is a gentle reminder that the academy fee payment for ${readableMonth} for your child, ${student.name}, is currently pending.\n\nPlease arrange to complete the payment at your earliest convenience. Thank you!\n\nBest regards,\nMUFC Academy`;
+            messageText = `Dear ${addressee},\n\nThis is a gentle reminder that the academy fee payment of 150 SAR for ${readableMonth} for your child, ${student.name}, is currently pending.\n\nPlease arrange to complete the payment at your earliest convenience. Thank you!\n\nBest regards,\nMUFC Academy`;
         }
         const encodedMessage = encodeURIComponent(messageText);
 
@@ -2041,7 +2061,7 @@ function renderAcademyPayments() {
                 <div style="padding: 8px 12px; font-size: 0.85rem; border-radius: 8px; font-weight: bold; width: 90px; text-align: center; display: flex; align-items: center; justify-content: center; gap: 6px; ${isPaid ? 'background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16,185,129,0.3);' : 'background: rgba(148, 163, 184, 0.1); color: #94a3b8; border: 1px solid rgba(148,163,184,0.2);'}">
                     <i class="fa-solid ${isPaid ? 'fa-check-circle' : 'fa-minus-circle'}"></i> ${isPaid ? 'Paid' : 'Unpaid'}
                 </div>
-                ${student.whatsapp ? `<a href="https://wa.me/${student.whatsapp.replace(/\D/g, '')}?text=${encodedMessage}" target="_blank" class="btn-primary" style="display: flex; align-items: center; background: #25D366; border-color: #25D366; color: white; text-decoration: none; padding: 8px 15px; border-radius: 8px; font-size: 0.85rem; font-weight: bold; gap: 6px; transition: 0.2s;"><i class="fa-brands fa-whatsapp" style="font-size: 1.1rem;"></i> Message</a>` : ''}
+                ${student.whatsapp ? `<a href="https://web.whatsapp.com/send?phone=${student.whatsapp.replace(/\D/g, '')}&text=${encodedMessage}" target="_blank" class="btn-primary" style="display: flex; align-items: center; background: #25D366; border-color: #25D366; color: white; text-decoration: none; padding: 8px 15px; border-radius: 8px; font-size: 0.85rem; font-weight: bold; gap: 6px; transition: 0.2s;"><i class="fa-brands fa-whatsapp" style="font-size: 1.1rem;"></i> Message</a>` : ''}
             </div>
         `;
         list.appendChild(div);
@@ -2818,4 +2838,64 @@ function exportPnL() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+}
+
+
+// ================= ACADEMY APPROVALS LOGIC =================
+function renderAcademyApprovals() {
+    const list = document.getElementById('academy-approvals-list');
+    if(!list) return;
+    list.innerHTML = '';
+    
+    const pendingStudents = academyStudents.filter(s => s.pendingDeletion === true);
+    
+    if(pendingStudents.length === 0) {
+        list.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 20px;">No pending deletion requests.</p>';
+        return;
+    }
+    
+    pendingStudents.forEach(student => {
+        const div = document.createElement('div');
+        div.className = 'player-card';
+        div.style.display = 'flex';
+        div.style.alignItems = 'center';
+        div.style.justifyContent = 'space-between';
+        
+        div.innerHTML = `
+            <div class="player-info">
+                <div class="profile-pic" style="${student.pic ? `background-image: url('${student.pic}');` : ''}"></div>
+                <div>
+                    <h3 style="font-size: 1.1rem; color: #fff;">${escapeHtml(student.name)}</h3>
+                    <p style="font-size: 0.85rem; color: var(--text-muted);">ID: ${escapeHtml(student.id)} | Requested by: ${escapeHtml(student.pendingDeletionBy || 'Unknown')}</p>
+                </div>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button class="btn-primary" style="background: #ef4444; border-color: #ef4444;" onclick="approveDeletion('${student.id}')"><i class="fa-solid fa-check"></i> Approve Delete</button>
+                <button class="btn-secondary" onclick="rejectDeletion('${student.id}')"><i class="fa-solid fa-xmark"></i> Reject</button>
+            </div>
+        `;
+        list.appendChild(div);
+    });
+}
+
+function approveDeletion(id) {
+    if(!confirm("Are you sure you want to PERMANENTLY delete this student?")) return;
+    academyStudents = academyStudents.filter(s => s.id !== id);
+    saveData();
+    renderAcademyApprovals();
+    renderAcademyStudents();
+    renderAcademyReports();
+    alert("Student deleted successfully.");
+}
+
+function rejectDeletion(id) {
+    const student = academyStudents.find(s => s.id === id);
+    if(student) {
+        delete student.pendingDeletion;
+        delete student.pendingDeletionBy;
+        saveData();
+        renderAcademyApprovals();
+        renderAcademyStudents();
+        alert("Deletion request rejected. The student has been restored.");
+    }
 }
