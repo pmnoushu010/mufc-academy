@@ -2041,19 +2041,37 @@ function renderAcademyPayments() {
         div.style.padding = '12px 20px';
         div.style.gap = '20px';
         
-        div.innerHTML = `
-            <div class="player-info" style="display: flex; align-items: center; gap: 15px; min-width: 250px;">
-                <div class="profile-pic" style="min-width: 45px; height: 45px; ${student.pic ? `background-image: url('${student.pic}');` : ''}"></div>
-                <div style="overflow: hidden;">
-                    <h3 style="font-size: 1.1rem; color: ${hasAttended ? (isPaid ? '#10b981' : '#ef4444') : (student.gender === 'Female' ? '#ec4899' : '#fff')}; white-space: nowrap; text-overflow: ellipsis; overflow: hidden;">${escapeHtml(student.name)} ${student.age ? `<span style="font-size: 0.85rem; color: var(--text-muted); font-weight: normal; margin-left: 4px;">(${student.age} Yrs)</span>` : ''}</h3>
-                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 2px;">ID: ${escapeHtml(student.id)} | Parent: ${escapeHtml(student.fatherName || 'N/A')}</p>
-                </div>
-            </div>
+            const outstanding = hasAttended ? Math.max(0, 150 - amountPaid) : 0;
             
-            <div style="display: flex; align-items: center; gap: 15px; flex: 1; justify-content: flex-end;">
-                <input type="text" maxlength="25" value="${escapeHtml(student.remarks || '')}" placeholder="No remarks" style="width: 250px; padding: 8px; border-radius: 8px; background: rgba(15, 23, 42, 0.5); color: #9ca3af; border: 1px solid #374151; font-size: 0.85rem;" readonly>
+            let outstandingHtml = '';
+            if (outstanding > 0) {
+                outstandingHtml = `
+                    <div style="width: 150px; display: flex; align-items: center; justify-content: flex-end; gap: 8px;">
+                        <span style="color: #ef4444; font-weight: bold; font-size: 0.9rem;">${outstanding} SAR</span>
+                        <button class="btn-primary" style="padding: 4px 8px; font-size: 0.75rem; border-radius: 6px;" onclick="payOutstanding('${student.id}', '${monthStr}', ${outstanding})" title="Pay Outstanding">Pay</button>
+                    </div>
+                `;
+            } else {
+                outstandingHtml = `
+                    <div style="width: 150px; text-align: right; color: #10b981; font-weight: bold; font-size: 0.9rem;">
+                        0 SAR
+                    </div>
+                `;
+            }
+
+            div.innerHTML = `
+                <div class="player-info" style="display: flex; align-items: center; gap: 15px; min-width: 250px;">
+                    <div class="profile-pic" style="min-width: 45px; height: 45px; ${student.pic ? `background-image: url('${student.pic}');` : ''}"></div>
+                    <div style="overflow: hidden;">
+                        <h3 style="font-size: 1.1rem; color: ${hasAttended ? (isPaid ? '#10b981' : '#ef4444') : (student.gender === 'Female' ? '#ec4899' : '#fff')}; white-space: nowrap; text-overflow: ellipsis; overflow: hidden;">${escapeHtml(student.name)} ${student.age ? `<span style="font-size: 0.85rem; color: var(--text-muted); font-weight: normal; margin-left: 4px;">(${student.age} Yrs)</span>` : ''}</h3>
+                        <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 2px;">ID: ${escapeHtml(student.id)} | Parent: ${escapeHtml(student.fatherName || 'N/A')}</p>
+                    </div>
+                </div>
                 
-                <div style="width: 1px; height: 30px; background: #374151; margin: 0 5px;"></div>
+                <div style="display: flex; align-items: center; gap: 15px; flex: 1; justify-content: flex-end;">
+                    ${outstandingHtml}
+                    
+                    <div style="width: 1px; height: 30px; background: #374151; margin: 0 5px;"></div>
                 
                 <div style="color: #fff; font-size: 1.1rem; font-weight: bold; background: rgba(255,255,255,0.05); padding: 4px 10px; border-radius: 8px; display: flex; align-items: center; justify-content: center; width: 85px; gap: 4px;">
                     ${amount ? amount : '0'} <span style="font-size: 0.75rem; color: var(--text-muted);">SAR</span>
@@ -2187,6 +2205,33 @@ function togglePaymentStatusFromAttendance(studentId, monthStr) {
     }
     saveData();
     renderAcademyAttendance();
+    if(document.getElementById('view-academy-accounts').classList.contains('active')) renderAcademyAccounts();
+}
+
+function payOutstanding(studentId, monthStr, outstandingAmount) {
+    if (!confirm(`Confirm paying outstanding balance of ${outstandingAmount} SAR?`)) return;
+    
+    let payment = getAcademyPaymentForMonth(monthStr, studentId);
+    if (!payment) {
+        academyPayments.push({
+            month: monthStr,
+            studentId: studentId,
+            amount: outstandingAmount,
+            paid: outstandingAmount,
+            status: 'Paid'
+        });
+    } else {
+        const currentAmount = parseFloat(payment.amount) || parseFloat(payment.paid) || 0;
+        const newTotal = currentAmount + outstandingAmount;
+        payment.amount = newTotal;
+        payment.paid = newTotal;
+        payment.status = 'Paid';
+    }
+    
+    saveData();
+    renderAcademyPayments();
+    
+    if(document.getElementById('view-academy-attendance').classList.contains('active')) renderAcademyAttendance();
     if(document.getElementById('view-academy-accounts').classList.contains('active')) renderAcademyAccounts();
 }
 
