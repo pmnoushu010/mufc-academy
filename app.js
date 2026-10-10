@@ -2752,8 +2752,9 @@ function renderPnL() {
         academyAccounts.forEach(acc => {
             if (acc.date && acc.date.startsWith(monthStr)) {
                 const amt = parseFloat(acc.amount) || 0;
-                if (acc.type === 'Income') otherIncomeForMonth += amt;
-                else if (acc.type === 'Expense') expensesForMonth += amt;
+                const type = (acc.type || '').toLowerCase();
+                if (type === 'income') otherIncomeForMonth += amt;
+                else if (type === 'expense') expensesForMonth += amt;
             }
         });
         
