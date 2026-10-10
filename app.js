@@ -3033,6 +3033,8 @@ function renderAcademyDashboard() {
                 }]
             },
             options: {
+                responsive: true,
+                maintainAspectRatio: false,
                 plugins: { legend: { labels: { color: '#fff' } } }
             }
         });
@@ -3063,6 +3065,8 @@ function renderAcademyDashboard() {
                 }]
             },
             options: {
+                responsive: true,
+                maintainAspectRatio: false,
                 scales: {
                     y: { beginAtZero: true, ticks: { color: '#9ca3af', stepSize: 1, precision: 0 } },
                     x: { ticks: { color: '#9ca3af' } }
@@ -3097,6 +3101,8 @@ function renderAcademyDashboard() {
                 }]
             },
             options: {
+                responsive: true,
+                maintainAspectRatio: false,
                 scales: {
                     y: { beginAtZero: true, ticks: { color: '#9ca3af', stepSize: 1, precision: 0 } },
                     x: { ticks: { color: '#9ca3af' } }
