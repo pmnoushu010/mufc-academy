@@ -51,35 +51,12 @@ async function getAppData() {
     let data = await AppData.findOne();
     if (!data) {
         data = await AppData.create({
-            players: [
-                { id: 1, name: "Marcus Rashford", number: 10, email: "marcus@mufc.com", password: "password", dob: "1997-10-31" },
-                { id: 2, name: "Bruno Fernandes", number: 8, email: "bruno@mufc.com", password: "password", dob: "1994-09-08" }
-            ],
+            players: [],
             pendingUsers: [],
-            messages: [
-                { sender: "Marcus Rashford", text: "Coach, I will be 10 mins late to training.", time: "10:30 AM" },
-                { sender: "Admin", to: "Marcus Rashford", text: "No problem Marcus, see you soon.", time: "10:32 AM" }
-            ],
-            matches: [
-                { id: "m1", title: "vs City FC (Premier League)", date: "2026-09-02", time: "18:00", location: "Old Trafford", isUpcoming: true },
-                { id: "m2", title: "vs Arsenal FC (Cup Semi-Final)", date: "2026-09-08", time: "20:00", location: "Emirates Stadium", isUpcoming: true },
-                { id: "m3", title: "vs Chelsea FC (League Match)", date: "2026-08-25", time: "16:30", location: "Stamford Bridge", isUpcoming: false }
-            ],
-            practiceSession: {
-                id: "practice_1",
-                title: "Tactical Drills & Fitness Training",
-                day: "Wednesday",
-                date: "2026-09-03",
-                time: "18:00 - 20:00",
-                location: "Carrington Training Pitch 2",
-                notes: "Bring full training kit, boots & water bottle."
-            },
-            attendance: [
-                { id: "att_p1", matchId: "practice_1", type: "practice", playerId: 1, playerName: "Marcus Rashford", status: "Approved", requestedAt: "09:15 AM" },
-                { id: "att_1", matchId: "m1", type: "match", playerId: 1, playerName: "Marcus Rashford", status: "Approved", requestedAt: "10:30 AM" },
-                { id: "att_2", matchId: "m3", type: "match", playerId: 1, playerName: "Marcus Rashford", status: "Approved", requestedAt: "15:00 PM" },
-                { id: "att_3", matchId: "m3", type: "match", playerId: 2, playerName: "Bruno Fernandes", status: "Approved", requestedAt: "15:00 PM" }
-            ],
+            messages: [],
+            matches: [],
+            practiceSession: {},
+            attendance: [],
             academyStudents: [],
             academyAttendance: [],
             academyPayments: [],

@@ -396,6 +396,8 @@ function performLogin(role, user) {
         document.querySelectorAll('#academy-nav .nav-item').forEach(item => {
             if (item.getAttribute('onclick').includes('academy-users')) {
                 item.style.display = (user && user.type === 'super') ? 'flex' : 'none';
+            } else if (item.getAttribute('onclick').includes('academy-pnl')) {
+                item.style.display = (user && user.type === 'super') ? 'flex' : 'none';
             } else if (item.getAttribute('onclick').includes('academy-accounts')) {
                 item.style.display = (user && (user.type === 'main' || user.type === 'super')) ? 'flex' : 'none';
             } else {
@@ -487,6 +489,8 @@ function switchView(viewId, event) {
         renderAcademyAccounts();
     } else if(viewId === 'academy-users') {
         renderAcademyUsers();
+    } else if(viewId === 'academy-pnl') {
+        renderPnL();
     }
 }
 
@@ -1684,7 +1688,7 @@ function openAcademyStudentDetails(id) {
         nameEl.style.color = '#3b82f6';
     } else {
         nameEl.innerText = student.name;
-        nameEl.style.color = '';
+        nameEl.style.color = (student.gender === 'Female') ? '#ec4899' : '';
     }
     
     document.getElementById('view-acad-id').innerText = student.id;
@@ -1868,7 +1872,7 @@ function renderAcademyAttendance() {
         const payment = getAcademyPaymentForMonth(monthStr, student.id);
         const isPaid = payment && payment.status === 'Paid';
         const hasAttended = academyAttendance.some(a => a.studentId === student.id && a.date.startsWith(monthStr) && a.status === 'Present');
-        const nameColor = student.role === 'coach' ? '#3b82f6' : (hasAttended ? (isPaid ? '#10b981' : '#ef4444') : '#fff');
+        const nameColor = student.role === 'coach' ? '#3b82f6' : (hasAttended ? (isPaid ? '#10b981' : '#ef4444') : (student.gender === 'Female' ? '#ec4899' : '#fff'));
         const amount = payment ? payment.amount || payment.paid || '' : '';
         
         const div = document.createElement('div');
@@ -2021,7 +2025,7 @@ function renderAcademyPayments() {
             <div class="player-info" style="display: flex; align-items: center; gap: 15px; min-width: 250px;">
                 <div class="profile-pic" style="min-width: 45px; height: 45px; ${student.pic ? `background-image: url('${student.pic}');` : ''}"></div>
                 <div style="overflow: hidden;">
-                    <h3 style="font-size: 1.1rem; color: ${hasAttended ? (isPaid ? '#10b981' : '#ef4444') : '#fff'}; white-space: nowrap; text-overflow: ellipsis; overflow: hidden;">${escapeHtml(student.name)} ${student.age ? `<span style="font-size: 0.85rem; color: var(--text-muted); font-weight: normal; margin-left: 4px;">(${student.age} Yrs)</span>` : ''}</h3>
+                    <h3 style="font-size: 1.1rem; color: ${hasAttended ? (isPaid ? '#10b981' : '#ef4444') : (student.gender === 'Female' ? '#ec4899' : '#fff')}; white-space: nowrap; text-overflow: ellipsis; overflow: hidden;">${escapeHtml(student.name)} ${student.age ? `<span style="font-size: 0.85rem; color: var(--text-muted); font-weight: normal; margin-left: 4px;">(${student.age} Yrs)</span>` : ''}</h3>
                     <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 2px;">ID: ${escapeHtml(student.id)} | Parent: ${escapeHtml(student.fatherName || 'N/A')}</p>
                 </div>
             </div>
@@ -2640,4 +2644,178 @@ function deleteAcademyUser(username) {
     academyAdmins = academyAdmins.filter(a => a.username !== username);
     saveData();
     renderAcademyUsers();
+}
+
+
+// ================= ACADEMY PROFIT & LOSS LOGIC =================
+function updatePnlSelectors() {
+    const type = document.getElementById('pnl-type').value;
+    document.getElementById('pnl-month-container').style.display = type === 'monthly' ? 'flex' : 'none';
+    document.getElementById('pnl-quarter-container').style.display = type === 'quarterly' ? 'flex' : 'none';
+    document.getElementById('pnl-year-container').style.display = type === 'yearly' ? 'flex' : 'none';
+}
+
+function getMonthsForPnlPeriod() {
+    const type = document.getElementById('pnl-type').value;
+    let months = [];
+    if (type === 'monthly') {
+        const val = document.getElementById('pnl-month').value;
+        if (val) months.push(val); // format YYYY-MM
+    } else if (type === 'quarterly') {
+        const q = parseInt(document.getElementById('pnl-quarter-q').value);
+        const y = document.getElementById('pnl-quarter-year').value;
+        if (y) {
+            const startMonth = (q - 1) * 3 + 1;
+            for (let i = 0; i < 3; i++) {
+                months.push(`${y}-${String(startMonth + i).padStart(2, '0')}`);
+            }
+        }
+    } else if (type === 'yearly') {
+        const y = document.getElementById('pnl-year').value;
+        if (y) {
+            for (let i = 1; i <= 12; i++) {
+                months.push(`${y}-${String(i).padStart(2, '0')}`);
+            }
+        }
+    }
+    return months;
+}
+
+let lastPnlData = [];
+
+function renderPnL() {
+    const months = getMonthsForPnlPeriod();
+    if (months.length === 0) return alert("Please select a valid period.");
+    
+    let totalIncome = 0;
+    let totalExpense = 0;
+    let totalReceivable = 0;
+    
+    let breakdownHTML = '';
+    lastPnlData = [];
+    
+    months.forEach(monthStr => {
+        // 1. Fee Income & Receivables
+        let feeIncomeForMonth = 0;
+        let receivableForMonth = 0;
+        
+        // Find students who attended this month
+        let attendedStudents = new Set();
+        academyAttendance.forEach(a => {
+            if (a.date.startsWith(monthStr) && a.status === 'Present') {
+                attendedStudents.add(a.studentId);
+            }
+        });
+        
+        // Calculate expected 150 vs paid
+        attendedStudents.forEach(studentId => {
+            const payment = getAcademyPaymentForMonth(monthStr, studentId);
+            const amountPaid = payment ? (parseFloat(payment.amount) || parseFloat(payment.paid) || 0) : 0;
+            const remaining = 150 - amountPaid;
+            if (remaining > 0) {
+                receivableForMonth += remaining;
+            }
+        });
+        
+        // For actual income, we sum all payments made for this month
+        academyPayments.forEach(p => {
+            if (p.month === monthStr) {
+                const amt = parseFloat(p.amount) || parseFloat(p.paid) || 0;
+                feeIncomeForMonth += amt;
+            }
+        });
+        
+        // 2. Additional Income & Expenses from Accounts Tab
+        let otherIncomeForMonth = 0;
+        let expensesForMonth = 0;
+        
+        academyAccounts.forEach(acc => {
+            if (acc.date && acc.date.startsWith(monthStr)) {
+                const amt = parseFloat(acc.amount) || 0;
+                if (acc.type === 'Income') otherIncomeForMonth += amt;
+                else if (acc.type === 'Expense') expensesForMonth += amt;
+            }
+        });
+        
+        const monthIncome = feeIncomeForMonth + otherIncomeForMonth;
+        const monthProfit = monthIncome - expensesForMonth;
+        
+        totalIncome += monthIncome;
+        totalExpense += expensesForMonth;
+        totalReceivable += receivableForMonth;
+        
+        if (monthIncome > 0 || expensesForMonth > 0 || receivableForMonth > 0) {
+            const dateObj = new Date(monthStr + '-01');
+            const readableMonth = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
+            
+            lastPnlData.push({
+                Month: readableMonth,
+                "Fee Collections": feeIncomeForMonth,
+                "Other Income": otherIncomeForMonth,
+                "Total Income": monthIncome,
+                "Total Expenses": expensesForMonth,
+                "Net Profit": monthProfit,
+                "Receivables": receivableForMonth
+            });
+            
+            breakdownHTML += `
+                <div style="background: rgba(30, 41, 59, 0.3); border: 1px solid rgba(255,255,255,0.05); padding: 15px; border-radius: 8px;">
+                    <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px; margin-bottom: 8px;">
+                        <strong style="color: #fff;">${readableMonth}</strong>
+                        <strong style="color: ${monthProfit >= 0 ? '#10b981' : '#ef4444'};">Net: ${monthProfit} SAR</strong>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 0.85rem; color: var(--text-muted);">
+                        <div>
+                            <div>Fee Collections: <span style="color: #fff;">${feeIncomeForMonth} SAR</span></div>
+                            <div>Other Income: <span style="color: #fff;">${otherIncomeForMonth} SAR</span></div>
+                        </div>
+                        <div>
+                            <div>Expenses: <span style="color: #fff;">${expensesForMonth} SAR</span></div>
+                            <div>Receivables (Outstanding): <span style="color: #f59e0b;">${receivableForMonth} SAR</span></div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+    });
+    
+    document.getElementById('pnl-total-income').innerHTML = totalIncome + ' <span style="font-size: 0.9rem; color: var(--text-muted);">SAR</span>';
+    document.getElementById('pnl-total-expense').innerHTML = totalExpense + ' <span style="font-size: 0.9rem; color: var(--text-muted);">SAR</span>';
+    
+    const netProfit = totalIncome - totalExpense;
+    const profitEl = document.getElementById('pnl-net-profit');
+    profitEl.innerHTML = netProfit + ' <span style="font-size: 0.9rem; color: var(--text-muted);">SAR</span>';
+    profitEl.style.color = netProfit >= 0 ? '#3b82f6' : '#ef4444';
+    
+    document.getElementById('pnl-total-receivable').innerHTML = totalReceivable + ' <span style="font-size: 0.9rem; color: var(--text-muted);">SAR</span>';
+    
+    const breakdownEl = document.getElementById('pnl-breakdown');
+    if (breakdownHTML === '') {
+        breakdownEl.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 20px;">No financial data for the selected period.</p>';
+    } else {
+        breakdownEl.innerHTML = breakdownHTML;
+    }
+}
+
+function exportPnL() {
+    if (!lastPnlData || lastPnlData.length === 0) {
+        return alert("No data to export. Please calculate first.");
+    }
+    
+    let csvContent = "data:text/csv;charset=utf-8,";
+    const headers = Object.keys(lastPnlData[0]);
+    csvContent += headers.join(",") + "\n";
+    
+    lastPnlData.forEach(row => {
+        const values = headers.map(h => row[h]);
+        csvContent += values.join(",") + "\n";
+    });
+    
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `mufc_pnl_report_${Date.now()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 }

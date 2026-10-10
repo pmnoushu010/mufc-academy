@@ -54,6 +54,13 @@
                 <div class="form-group" id="group-reg-dob">
                     <input type="text" onfocus="(this.type='date')" onblur="(this.value == '' ? this.type='text' : this.type='date')" id="reg-dob" placeholder="Date of Birth" class="date-input">
                 </div>
+                <div class="form-group" id="group-reg-gender">
+                    <select id="reg-gender" class="form-select" style="width: 100%; padding: 12px; border-radius: 8px; background: rgba(15, 23, 42, 0.8); color: white; border: 1px solid #374151;">
+                        <option value="" disabled selected>Select Gender</option>
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                    </select>
+                </div>
                 <div class="form-group" id="group-reg-pic">
                     <input type="file" id="reg-pic" accept="image/*" class="file-input" title="Profile Picture">
                 </div>
@@ -133,6 +140,9 @@
                     </a>
                     <a href="#" class="nav-item" onclick="switchView('academy-accounts', event)">
                         <i class="fa-solid fa-file-invoice-dollar"></i><span>Accounts</span>
+                    </a>
+                    <a href="#" class="nav-item" id="nav-pnl" style="display: none;" onclick="switchView('academy-pnl', event)">
+                        <i class="fa-solid fa-chart-pie"></i><span>Profit & Loss</span>
                     </a>
                     <a href="#" class="nav-item" onclick="switchView('academy-users', event)">
                         <i class="fa-solid fa-user-shield"></i><span>Users</span>
@@ -525,6 +535,74 @@
                     </div>
                 </section>
 
+                <section id="view-academy-pnl" class="view">
+                    <div class="view-header" style="margin-bottom: 20px;">
+                        <h2>Profit & Loss Report</h2>
+                        <p style="font-size: 0.8rem; color: var(--text-muted);">View financial summary and export data (Super Admin Only)</p>
+                    </div>
+
+                    <div style="display: flex; gap: 15px; margin-bottom: 20px; align-items: center; background: rgba(30, 41, 59, 0.5); padding: 15px; border-radius: 12px; border: 1px solid #374151;">
+                        <div style="display: flex; flex-direction: column; gap: 5px;">
+                            <label style="font-size: 0.8rem; color: var(--text-muted);">Period Type</label>
+                            <select id="pnl-type" class="custom-select" style="width: 150px;" onchange="updatePnlSelectors()">
+                                <option value="monthly">Monthly</option>
+                                <option value="quarterly">Quarterly</option>
+                                <option value="yearly">Yearly</option>
+                            </select>
+                        </div>
+                        <div id="pnl-month-container" style="display: flex; flex-direction: column; gap: 5px;">
+                            <label style="font-size: 0.8rem; color: var(--text-muted);">Select Month</label>
+                            <input type="month" id="pnl-month" class="custom-input" style="width: 180px;">
+                        </div>
+                        <div id="pnl-quarter-container" style="display: none; flex-direction: column; gap: 5px;">
+                            <label style="font-size: 0.8rem; color: var(--text-muted);">Select Quarter</label>
+                            <div style="display: flex; gap: 10px;">
+                                <select id="pnl-quarter-q" class="custom-select" style="width: 100px;">
+                                    <option value="1">Q1 (Jan-Mar)</option>
+                                    <option value="2">Q2 (Apr-Jun)</option>
+                                    <option value="3">Q3 (Jul-Sep)</option>
+                                    <option value="4">Q4 (Oct-Dec)</option>
+                                </select>
+                                <input type="number" id="pnl-quarter-year" class="custom-input" style="width: 100px;" value="2026">
+                            </div>
+                        </div>
+                        <div id="pnl-year-container" style="display: none; flex-direction: column; gap: 5px;">
+                            <label style="font-size: 0.8rem; color: var(--text-muted);">Select Year</label>
+                            <input type="number" id="pnl-year" class="custom-input" style="width: 120px;" value="2026">
+                        </div>
+                        <div style="display: flex; align-items: flex-end; padding-bottom: 2px;">
+                            <button class="btn-primary" onclick="renderPnL()"><i class="fa-solid fa-calculator"></i> Calculate</button>
+                            <button class="btn-secondary" style="margin-left: 10px;" onclick="exportPnL()"><i class="fa-solid fa-file-excel"></i> Export to Excel</button>
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 20px;">
+                        <div class="stat-card" style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2);">
+                            <h3 style="color: #10b981; font-size: 1rem;">Total Income</h3>
+                            <p id="pnl-total-income" style="font-size: 1.5rem; font-weight: bold; color: #fff;">0 <span style="font-size: 0.9rem; color: var(--text-muted);">SAR</span></p>
+                        </div>
+                        <div class="stat-card" style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2);">
+                            <h3 style="color: #ef4444; font-size: 1rem;">Total Expense</h3>
+                            <p id="pnl-total-expense" style="font-size: 1.5rem; font-weight: bold; color: #fff;">0 <span style="font-size: 0.9rem; color: var(--text-muted);">SAR</span></p>
+                        </div>
+                        <div class="stat-card" style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.2);">
+                            <h3 style="color: #3b82f6; font-size: 1rem;">Net Profit</h3>
+                            <p id="pnl-net-profit" style="font-size: 1.5rem; font-weight: bold; color: #fff;">0 <span style="font-size: 0.9rem; color: var(--text-muted);">SAR</span></p>
+                        </div>
+                        <div class="stat-card" style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.2);">
+                            <h3 style="color: #f59e0b; font-size: 1rem;">Receivable Fees</h3>
+                            <p id="pnl-total-receivable" style="font-size: 1.5rem; font-weight: bold; color: #fff;">0 <span style="font-size: 0.9rem; color: var(--text-muted);">SAR</span></p>
+                        </div>
+                    </div>
+
+                    <div style="background: var(--surface); border-radius: 12px; padding: 20px; border: 1px solid var(--border-color);">
+                        <h3 style="margin-bottom: 15px; color: var(--primary); font-size: 1.1rem;"><i class="fa-solid fa-list"></i> P&L Breakdown</h3>
+                        <div style="display: flex; flex-direction: column; gap: 10px;" id="pnl-breakdown">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+                </section>
+
                 <section id="view-academy-users" class="view">
                     <div class="view-header" style="margin-bottom: 20px;">
                         <h2>User Management</h2>
@@ -659,6 +737,14 @@
                     <div class="form-group" id="group-acad-dob">
                         <label>Date of Birth</label>
                         <input type="text" onfocus="(this.type='date')" onblur="(this.value == '' ? this.type='text' : this.type='date')" id="new-acad-dob" placeholder="Date of Birth">
+                    </div>
+                    <div class="form-group" id="group-acad-gender">
+                        <label>Gender</label>
+                        <select id="new-acad-gender" class="form-select" style="width: 100%; padding: 12px; border-radius: 8px; background: rgba(15, 23, 42, 0.8); color: white; border: 1px solid #374151;">
+                            <option value="" disabled selected>Select Gender</option>
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                        </select>
                     </div>
                     <div class="form-group" id="group-acad-contact">
                         <label>Contact Number (Mobile)</label>
@@ -971,6 +1057,6 @@
         </div>
 
     </div>
-    <script src="app.js"></script>
+    <script src="app.js?v=3"></script>
 </body>
 </html>
