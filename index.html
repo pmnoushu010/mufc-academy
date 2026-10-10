@@ -369,6 +369,11 @@
                         </div>
                         <button class="btn-primary" onclick="showAddAcademyStudentModal()" title="Add New Student"><i class="fa-solid fa-user-plus"></i></button>
                     </div>
+                    
+                    <div style="margin-bottom: 20px;">
+                        <input type="text" id="academy-student-search" placeholder="Search student name..." class="form-input" style="width: 100%; padding: 12px; border-radius: 8px; background: var(--bg-card); color: #fff; border: 1px solid #374151; font-size: 1rem;" onkeyup="renderAcademyStudents()">
+                    </div>
+                    
                     <div id="academy-student-list" class="player-list">
                         <!-- Populated dynamically -->
                     </div>
@@ -1070,6 +1075,6 @@
         </div>
 
     </div>
-    <script src="app.js?v=5"></script>
+    <script src="app.js?v=6"></script>
 </body>
 </html>

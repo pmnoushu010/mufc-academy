@@ -1649,12 +1649,27 @@ function renderAcademyStudents() {
     
     list.innerHTML = '';
     
-    if(academyStudents.length === 0) {
-        list.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 20px;">No students registered yet.</p>';
+    const searchInput = document.getElementById('academy-student-search');
+    const searchQuery = searchInput ? searchInput.value.toLowerCase() : '';
+    
+    let studentsToRender = academyStudents.filter(s => {
+        if (searchQuery && !s.name.toLowerCase().includes(searchQuery)) return false;
+        return true;
+    });
+    
+    // Sort by age ascending (youngest to oldest)
+    studentsToRender.sort((a, b) => {
+        const ageA = parseInt(a.age) || 999; // Put missing ages at the end
+        const ageB = parseInt(b.age) || 999;
+        return ageA - ageB;
+    });
+    
+    if(studentsToRender.length === 0) {
+        list.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 20px;">No students found.</p>';
         return;
     }
     
-    academyStudents.forEach(student => {
+    studentsToRender.forEach(student => {
         const totalAttended = calculateTotalAttended(student.id);
         const div = document.createElement('div');
         div.className = 'player-card';
@@ -1665,7 +1680,7 @@ function renderAcademyStudents() {
             <div class="player-info">
                 <div class="profile-pic" style="${student.pic ? `background-image: url('${student.pic}');` : ''}"></div>
                 <div>
-                    <h3 style="font-size: 1.1rem; color: ${student.role === 'coach' ? '#3b82f6' : (student.gender === 'Female' ? '#ec4899' : '#fff')};">${escapeHtml(student.name)} ${student.role === 'coach' ? '<span style="font-size: 0.75rem; background: rgba(59,130,246,0.2); color: #3b82f6; padding: 2px 6px; border-radius: 4px; margin-left: 6px; vertical-align: middle;">Coach</span>' : ''} ${student.pendingDeletion ? '<span style="font-size: 0.75rem; background: rgba(239, 68, 68, 0.2); color: #ef4444; padding: 2px 6px; border-radius: 4px; margin-left: 6px; vertical-align: middle;">Pending Deletion</span>' : ''}</h3>
+                    <h3 style="font-size: 1.1rem; color: ${student.role === 'coach' ? '#3b82f6' : (student.gender === 'Female' ? '#ec4899' : '#fff')};">${escapeHtml(student.name)} ${student.age ? `<span style="font-size: 0.85rem; color: var(--text-muted); font-weight: normal; margin-left: 4px;">(${student.age} Yrs)</span>` : ''} ${student.role === 'coach' ? '<span style="font-size: 0.75rem; background: rgba(59,130,246,0.2); color: #3b82f6; padding: 2px 6px; border-radius: 4px; margin-left: 6px; vertical-align: middle;">Coach</span>' : ''} ${student.pendingDeletion ? '<span style="font-size: 0.75rem; background: rgba(239, 68, 68, 0.2); color: #ef4444; padding: 2px 6px; border-radius: 4px; margin-left: 6px; vertical-align: middle;">Pending Deletion</span>' : ''}</h3>
                     <p style="font-size: 0.85rem; color: var(--text-muted);">ID: ${escapeHtml(student.id)} ${student.role !== 'coach' ? `| Parent: ${escapeHtml(student.fatherName || 'N/A')}` : ''} | Total Attended: ${totalAttended} Days</p>
                 </div>
             </div>
