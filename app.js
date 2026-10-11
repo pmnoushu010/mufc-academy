@@ -397,9 +397,9 @@ function performLogin(role, user) {
             if (item.getAttribute('onclick').includes('academy-users')) {
                 item.style.display = (user && user.type === 'super') ? 'flex' : 'none';
             } else if (item.getAttribute('onclick').includes('academy-dashboard')) {
-                item.style.display = (user && user.type === 'super') ? 'flex' : 'none';
+                item.style.display = (user && (user.type === 'main' || user.type === 'super')) ? 'flex' : 'none';
             } else if (item.getAttribute('onclick').includes('academy-pnl')) {
-                item.style.display = (user && user.type === 'super') ? 'flex' : 'none';
+                item.style.display = (user && (user.type === 'main' || user.type === 'super')) ? 'flex' : 'none';
             } else if (item.getAttribute('onclick').includes('academy-approvals')) {
                 item.style.display = (user && user.type === 'super') ? 'flex' : 'none';
             } else if (item.getAttribute('onclick').includes('academy-accounts')) {
@@ -1680,13 +1680,37 @@ function renderAcademyStudents() {
         div.style.cursor = 'pointer';
         div.onclick = () => openAcademyStudentDetails(student.id);
         
+        const initial = student.name ? student.name.trim().charAt(0).toUpperCase() : 'S';
+        const avatarStyle = student.pic 
+            ? `background-image: url('${student.pic}');` 
+            : `background: linear-gradient(135deg, #1e3a8a, #2563eb);`;
+            
+        const nameColor = student.role === 'coach' 
+            ? '#38bdf8' 
+            : (student.gender === 'Female' ? '#ec4899' : '#ffffff');
+            
         div.innerHTML = `
             <div class="player-info">
-                <div class="profile-pic" style="${student.pic ? `background-image: url('${student.pic}');` : ''}"></div>
-                <div>
-                    <h3 style="font-size: 1.1rem; color: ${student.role === 'coach' ? '#3b82f6' : (student.gender === 'Female' ? '#ec4899' : '#fff')};">${escapeHtml(student.name)} ${student.age ? `<span style="font-size: 0.85rem; color: var(--text-muted); font-weight: normal; margin-left: 4px;">(${student.age} Yrs)</span>` : ''} ${student.role === 'coach' ? '<span style="font-size: 0.75rem; background: rgba(59,130,246,0.2); color: #3b82f6; padding: 2px 6px; border-radius: 4px; margin-left: 6px; vertical-align: middle;">Coach</span>' : ''} ${student.pendingDeletion ? '<span style="font-size: 0.75rem; background: rgba(239, 68, 68, 0.2); color: #ef4444; padding: 2px 6px; border-radius: 4px; margin-left: 6px; vertical-align: middle;">Pending Deletion</span>' : ''}</h3>
-                    <p style="font-size: 0.85rem; color: var(--text-muted);">ID: ${escapeHtml(student.id)} ${student.role !== 'coach' ? `| Parent: ${escapeHtml(student.fatherName || 'N/A')}` : ''} | Total Attended: ${totalAttended} Days</p>
+                <div class="profile-pic" style="${avatarStyle}">
+                    ${student.pic ? '' : initial}
                 </div>
+                <div style="flex: 1; min-width: 0;">
+                    <h3 style="color: ${nameColor};">
+                        <span>${escapeHtml(student.name)}</span>
+                        ${student.age ? `<span class="player-age-badge">${student.age} Yrs</span>` : ''}
+                        ${student.role === 'coach' ? '<span style="font-size: 0.8rem; background: rgba(59,130,246,0.2); color: #3b82f6; padding: 2px 8px; border-radius: 6px; font-weight: 600;">Coach</span>' : ''}
+                        ${student.pendingDeletion ? '<span style="font-size: 0.8rem; background: rgba(239, 68, 68, 0.2); color: #ef4444; padding: 2px 8px; border-radius: 6px; font-weight: 600;">Pending Deletion</span>' : ''}
+                    </h3>
+                    <p>
+                        <span class="player-meta-item"><i class="fa-solid fa-id-badge" style="color: #ef4444;"></i>ID: <strong>${escapeHtml(student.id)}</strong></span>
+                        ${student.role !== 'coach' ? `<span class="player-meta-item"><i class="fa-solid fa-user-group" style="color: #38bdf8;"></i>Parent: <strong>${escapeHtml(student.fatherName || 'N/A')}</strong></span>` : ''}
+                        <span class="player-meta-item attendance"><i class="fa-solid fa-calendar-check" style="color: #10b981;"></i>Total Attended: <strong>${totalAttended} Days</strong></span>
+                    </p>
+                </div>
+            </div>
+            <div class="player-card-action">
+                <span>View Details</span>
+                <i class="fa-solid fa-chevron-right" style="font-size: 0.85rem;"></i>
             </div>
         `;
         list.appendChild(div);
@@ -1926,41 +1950,48 @@ function renderAcademyAttendance() {
         const nameColor = student.role === 'coach' ? '#3b82f6' : (hasAttended ? (isPaid ? '#10b981' : '#ef4444') : (student.gender === 'Female' ? '#ec4899' : '#fff'));
         const amount = payment ? payment.amount || payment.paid || '' : '';
         
+        const initial = student.name ? student.name.trim().charAt(0).toUpperCase() : 'S';
+        const avatarStyle = student.pic 
+            ? `background-image: url('${student.pic}');` 
+            : `background: linear-gradient(135deg, #1e3a8a, #2563eb);`;
+
         const div = document.createElement('div');
         div.className = 'player-card';
         div.style.display = 'flex';
         div.style.alignItems = 'center';
         div.style.justifyContent = 'space-between';
-        div.style.padding = '12px 20px';
+        div.style.padding = '16px 22px';
         div.style.gap = '20px';
         
         div.innerHTML = `
-            <div class="player-info" style="display: flex; align-items: center; gap: 15px; min-width: 200px;">
-                <div class="profile-pic" style="min-width: 45px; height: 45px; ${student.pic ? `background-image: url('${student.pic}');` : ''}"></div>
+            <div class="player-info" style="display: flex; align-items: center; gap: 16px; min-width: 240px;">
+                <div class="profile-pic" style="min-width: 50px; height: 50px; ${avatarStyle}">
+                    ${student.pic ? '' : initial}
+                </div>
                 <div style="overflow: hidden;">
-                    <h3 style="font-size: 1.1rem; color: ${nameColor}; white-space: nowrap; text-overflow: ellipsis; overflow: hidden;">${escapeHtml(student.name)} ${student.role === 'coach' ? '<span style="font-size: 0.75rem; background: rgba(59,130,246,0.2); color: #3b82f6; padding: 2px 6px; border-radius: 4px; margin-left: 4px; vertical-align: middle;">Coach</span>' : (student.age && student.age !== '-' ? `<span style="font-size: 0.85rem; color: var(--text-muted); font-weight: normal; margin-left: 4px;">(${student.age} Yrs)</span>` : '')} ${isPaid ? '<i class="fa-solid fa-circle-check" style="font-size: 0.85rem; margin-left: 4px;"></i>' : ''}</h3>
-                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 2px;">ID: ${escapeHtml(student.id)} ${student.role !== 'coach' ? `| Parent: ${escapeHtml(student.fatherName || 'N/A')}` : ''}</p>
+                    <h3 style="font-size: 1.25rem; font-weight: 600; color: ${nameColor}; white-space: nowrap; text-overflow: ellipsis; overflow: hidden;">${escapeHtml(student.name)} ${student.role === 'coach' ? '<span style="font-size: 0.8rem; background: rgba(59,130,246,0.2); color: #3b82f6; padding: 2px 8px; border-radius: 6px; margin-left: 6px; vertical-align: middle;">Coach</span>' : (student.age && student.age !== '-' ? `<span class="player-age-badge" style="margin-left: 6px;">${student.age} Yrs</span>` : '')} ${isPaid ? '<i class="fa-solid fa-circle-check" style="font-size: 0.95rem; color: #10b981; margin-left: 6px;"></i>' : ''}</h3>
+                    <p style="font-size: 0.95rem; color: var(--text-muted); margin-top: 3px;">ID: <strong style="color: #f1f5f9;">${escapeHtml(student.id)}</strong> ${student.role !== 'coach' ? `| Parent: <strong style="color: #f1f5f9;">${escapeHtml(student.fatherName || 'N/A')}</strong>` : ''}</p>
                 </div>
             </div>
             
-            <div style="display: flex; align-items: center; gap: 15px; flex: 1; justify-content: flex-end;">
+            <div style="display: flex; align-items: center; gap: 14px; flex: 1; justify-content: flex-end;">
                 <div style="display: flex; gap: 8px;">
-                    <button class="btn-primary" style="padding: 8px 12px; border-radius: 8px; font-size: 0.85rem; font-weight: bold; display: flex; align-items: center; gap: 6px; ${isPresent ? 'background: #10b981; color: white; border-color: #10b981;' : 'opacity: 0.5; background: #374151; border-color: #374151; color: #9ca3af;'}" onclick="markAcademyAttendance('${student.id}', '${dateStr}', 'Present')">
+                    <button class="btn-primary" style="padding: 10px 16px; border-radius: 10px; font-size: 0.95rem; font-weight: 600; display: flex; align-items: center; gap: 6px; ${isPresent ? 'background: #10b981; color: white; border-color: #10b981;' : 'opacity: 0.6; background: #374151; border-color: #374151; color: #9ca3af;'}" onclick="markAcademyAttendance('${student.id}', '${dateStr}', 'Present')">
                         <i class="fa-solid fa-check"></i> Present
                     </button>
-                    <button class="btn-secondary" style="padding: 8px 12px; border-radius: 8px; font-size: 0.85rem; font-weight: bold; display: flex; align-items: center; gap: 6px; ${!isPresent ? 'background: #ef4444; color: white; border-color: #ef4444;' : 'opacity: 0.5; background: #374151; border-color: #374151; color: #9ca3af;'}" onclick="markAcademyAttendance('${student.id}', '${dateStr}', 'Absent')">
+                    <button class="btn-secondary" style="padding: 10px 16px; border-radius: 10px; font-size: 0.95rem; font-weight: 600; display: flex; align-items: center; gap: 6px; ${!isPresent ? 'background: #ef4444; color: white; border-color: #ef4444;' : 'opacity: 0.6; background: #374151; border-color: #374151; color: #9ca3af;'}" onclick="markAcademyAttendance('${student.id}', '${dateStr}', 'Absent')">
                         <i class="fa-solid fa-xmark"></i> Absent
                     </button>
                 </div>
                 
-                <input type="text" maxlength="25" value="${escapeHtml(student.remarks || '')}" placeholder="Remarks (Max 25)" style="width: 250px; padding: 8px; border-radius: 8px; background: rgba(15, 23, 42, 0.8); color: white; border: 1px solid #374151; font-size: 0.85rem;" onchange="updateAcademyRemark('${student.id}', this.value)">
+                <input type="text" maxlength="25" value="${escapeHtml(student.remarks || '')}" placeholder="Remarks (Max 25)" style="width: 250px; padding: 10px 14px; border-radius: 10px; background: rgba(15, 23, 42, 0.8); color: white; border: 1px solid #374151; font-size: 0.95rem;" onchange="updateAcademyRemark('${student.id}', this.value)">
                 
                 <div style="width: 1px; height: 30px; background: #374151; margin: 0 5px;"></div>
                 
                 ${student.role === 'coach' ? '' : `
                 <div style="display: flex; gap: 8px; align-items: center;">
-                    <input type="number" id="attendance-fee-${student.id}" value="${amount}" placeholder="SAR" style="width: 80px; padding: 8px; border-radius: 8px; background: rgba(15, 23, 42, 0.8); color: white; border: 1px solid #374151; text-align: center; font-weight: bold; font-size: 0.85rem;" oninput="handleFeeInput(this, '${student.id}', '${monthStr}')">
-                    <button id="pay-btn-${student.id}" class="btn-primary" style="padding: 8px 12px; border-radius: 8px; font-size: 0.85rem; font-weight: bold; display: flex; align-items: center; gap: 6px; ${isPaid ? 'background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16,185,129,0.3); opacity: 1;' : (amount > 0 ? 'background: #3b82f6; color: white; border: 1px solid #3b82f6; opacity: 1;' : 'background: #374151; color: #9ca3af; border: 1px solid #374151; opacity: 0.5;')}" onclick="togglePaymentStatusFromAttendance('${student.id}', '${monthStr}')" ${(!isPaid && (!amount || amount <= 0)) || isPaid ? 'disabled' : ''}>
+                    <input type="number" id="attendance-fee-${student.id}" value="${amount}" placeholder="SAR" style="width: 90px; padding: 10px; border-radius: 10px; background: rgba(15, 23, 42, 0.8); color: white; border: 1px solid #374151; text-align: center; font-weight: bold; font-size: 0.95rem;" oninput="handleFeeInput(this, '${student.id}', '${monthStr}')">
+                    <button id="pay-btn-${student.id}" class="btn-primary" style="padding: 10px 16px; border-radius: 10px; font-size: 0.95rem; font-weight: 600; display: flex; align-items: center; gap: 6px; ${isPaid ? 'background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16,185,129,0.3); opacity: 1;' : (amount > 0 ? 'background: #3b82f6; color: white; border: 1px solid #3b82f6; opacity: 1;' : 'background: #374151; color: #9ca3af; border: 1px solid #374151; opacity: 0.5;')}" onclick="togglePaymentStatusFromAttendance('${student.id}', '${monthStr}')" ${(!isPaid && (!amount || amount <= 0)) || isPaid ? 'disabled' : ''}>
                         <i class="fa-solid fa-wallet"></i> ${isPaid ? 'Paid' : 'Pay'}
                     </button>
                 </div>
@@ -1988,6 +2019,68 @@ function markAcademyAttendance(studentId, dateStr, status) {
 
 function getAcademyPaymentForMonth(monthStr, studentId) {
     return academyPayments.find(p => p.month === monthStr && p.studentId === studentId);
+}
+
+function getPaymentReceivedDate(payment, studentId, monthStr) {
+    if (!payment || (payment.status !== 'Paid' && payment.status !== 'paid')) return null;
+    if (payment.date) return payment.date;
+    if (payment.paidDate) return payment.paidDate;
+    if (payment.history && payment.history.length > 0) {
+        const lastEntry = payment.history[payment.history.length - 1];
+        if (lastEntry && lastEntry.date) return lastEntry.date;
+    }
+    // Fallback: Check attendance records for that student in that month
+    const attRecord = academyAttendance.find(a => a.studentId === studentId && a.date && a.date.startsWith(monthStr) && a.status === 'Present');
+    if (attRecord && attRecord.date) return attRecord.date;
+    return null;
+}
+
+function formatPaymentDate(dateStr) {
+    if (!dateStr) return '-';
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+        const dObj = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+        if (!isNaN(dObj.getTime())) {
+            const day = parts[2];
+            const mon = dObj.toLocaleDateString('en-US', { month: 'short' });
+            const yr = parts[0];
+            return `${day} ${mon} ${yr}`;
+        }
+    }
+    return dateStr;
+}
+
+function markWhatsappSent(studentId, monthStr, btnElement) {
+    if (btnElement) {
+        btnElement.style.background = '#eab308';
+        btnElement.style.borderColor = '#ca8a04';
+        btnElement.style.color = '#0f172a';
+        btnElement.title = 'WhatsApp message already sent. Click to open again.';
+        btnElement.innerHTML = `<i class="fa-brands fa-whatsapp" style="font-size: 1.15rem; color: #0f172a;"></i> Sent`;
+    }
+
+    let payment = getAcademyPaymentForMonth(monthStr, studentId);
+    if (!payment) {
+        payment = {
+            month: monthStr,
+            studentId: studentId,
+            amount: 0,
+            paid: 0,
+            status: 'Unpaid',
+            whatsappSent: true,
+            whatsappSentDate: new Date().toISOString()
+        };
+        academyPayments.push(payment);
+    } else {
+        payment.whatsappSent = true;
+        payment.whatsappSentDate = new Date().toISOString();
+    }
+    
+    try {
+        localStorage.setItem(`wa_sent_${monthStr}_${studentId}`, 'true');
+    } catch(e) {}
+    
+    saveData();
 }
 
 function renderAcademyPayments() {
@@ -2025,11 +2118,33 @@ function renderAcademyPayments() {
     });
     
     studentsToRender.sort((a, b) => {
+        const paymentA = getAcademyPaymentForMonth(monthStr, a.id);
+        const isPaidA = paymentA && paymentA.status === 'Paid';
+        const paymentB = getAcademyPaymentForMonth(monthStr, b.id);
+        const isPaidB = paymentB && paymentB.status === 'Paid';
+
+        // 1. Paid students on top
+        if (isPaidA && !isPaidB) return -1;
+        if (!isPaidA && isPaidB) return 1;
+
+        // 2. Both are Paid: Order by most recent payment date first (newest to oldest)
+        if (isPaidA && isPaidB) {
+            const dateA = getPaymentReceivedDate(paymentA, a.id, monthStr) || '';
+            const dateB = getPaymentReceivedDate(paymentB, b.id, monthStr) || '';
+            if (dateA && dateB && dateA !== dateB) {
+                return dateB.localeCompare(dateA);
+            }
+            if (dateA && !dateB) return -1;
+            if (!dateA && dateB) return 1;
+        }
+
+        // 3. Secondary order: by age ascending, then alphabetically by name
         let ageA = parseInt(a.age);
         if (isNaN(ageA)) ageA = 999;
         let ageB = parseInt(b.age);
         if (isNaN(ageB)) ageB = 999;
-        return ageA - ageB;
+        if (ageA !== ageB) return ageA - ageB;
+        return (a.name || '').localeCompare(b.name || '');
     });
     
     if(studentsToRender.length === 0) {
@@ -2043,6 +2158,7 @@ function renderAcademyPayments() {
         const payment = getAcademyPaymentForMonth(monthStr, student.id);
         const amount = payment ? payment.amount || payment.paid || '' : '';
         const isPaid = payment && payment.status === 'Paid';
+        const isWaSent = (payment && (payment.whatsappSent || payment.whatsappSentDate)) || (localStorage.getItem(`wa_sent_${monthStr}_${student.id}`) === 'true');
         const hasAttended = academyAttendance.some(a => a.studentId === student.id && a.date.startsWith(monthStr) && a.status === 'Present');
         
         if (isPaid) {
@@ -2070,52 +2186,88 @@ function renderAcademyPayments() {
         const encodedMessage = encodeURIComponent(messageText);
 
         const div = document.createElement('div');
-        div.className = 'player-card';
-        div.style.display = 'flex';
-        div.style.alignItems = 'center';
-        div.style.justifyContent = 'space-between';
-        div.style.padding = '12px 20px';
-        div.style.gap = '20px';
+        div.className = 'player-card payment-player-card';
         
-            const outstanding = hasAttended ? Math.max(0, 150 - amountPaid) : 0;
-            
-            let outstandingHtml = '';
-            if (outstanding > 0) {
-                outstandingHtml = `
-                    <div style="width: 150px; display: flex; align-items: center; justify-content: flex-end; gap: 8px;">
-                        <span style="color: #ef4444; font-weight: bold; font-size: 0.9rem;">${outstanding} SAR</span>
-                        <button class="btn-primary" style="padding: 4px 8px; font-size: 0.75rem; border-radius: 6px;" onclick="payOutstanding('${student.id}', '${monthStr}', ${outstanding})" title="Pay Outstanding">Pay</button>
-                    </div>
-                `;
-            } else {
-                outstandingHtml = `
-                    <div style="width: 150px; text-align: right; color: #10b981; font-weight: bold; font-size: 0.9rem;">
-                        0 SAR
-                    </div>
-                `;
-            }
+        const outstanding = hasAttended ? Math.max(0, 150 - amountPaid) : 0;
+        
+        let outstandingHtml = '';
+        if (outstanding > 0) {
+            outstandingHtml = `
+                <div style="display: inline-flex; align-items: center; justify-content: center; gap: 8px;">
+                    <span style="color: #ef4444; font-weight: bold; font-size: 1rem;">${outstanding} SAR</span>
+                    <button class="btn-primary" style="padding: 5px 12px; font-size: 0.85rem; border-radius: 8px;" onclick="payOutstanding('${student.id}', '${monthStr}', ${outstanding})" title="Pay Outstanding">Pay</button>
+                </div>
+            `;
+        } else {
+            outstandingHtml = `
+                <span style="color: #10b981; font-weight: bold; font-size: 1rem;">0 SAR</span>
+            `;
+        }
 
-            div.innerHTML = `
-                <div class="player-info" style="display: flex; align-items: center; gap: 15px; min-width: 250px;">
-                    <div class="profile-pic" style="min-width: 45px; height: 45px; ${student.pic ? `background-image: url('${student.pic}');` : ''}"></div>
-                    <div style="overflow: hidden;">
-                        <h3 style="font-size: 1.1rem; color: ${hasAttended ? (isPaid ? '#10b981' : '#ef4444') : (student.gender === 'Female' ? '#ec4899' : '#fff')}; white-space: nowrap; text-overflow: ellipsis; overflow: hidden;">${escapeHtml(student.name)} ${student.age ? `<span style="font-size: 0.85rem; color: var(--text-muted); font-weight: normal; margin-left: 4px;">(${student.age} Yrs)</span>` : ''}</h3>
-                        <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 2px;">ID: ${escapeHtml(student.id)} | Parent: ${escapeHtml(student.fatherName || 'N/A')}</p>
-                    </div>
+        const initial = student.name ? student.name.trim().charAt(0).toUpperCase() : 'S';
+        const avatarStyle = student.pic 
+            ? `background-image: url('${student.pic}');` 
+            : `background: linear-gradient(135deg, #1e3a8a, #2563eb);`;
+
+        const rcvdDate = getPaymentReceivedDate(payment, student.id, monthStr);
+        let rcvdDateHtml = '';
+        if (isPaid && rcvdDate) {
+            rcvdDateHtml = `
+                <span class="payment-date-badge" title="Received on ${rcvdDate}" style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; font-size: 0.9rem; font-weight: 600; background: rgba(16, 185, 129, 0.12); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.25);">
+                    <i class="fa-regular fa-calendar-check" style="font-size: 0.85rem; color: #10b981;"></i> ${formatPaymentDate(rcvdDate)}
+                </span>
+            `;
+        } else if (isPaid) {
+            rcvdDateHtml = `
+                <span class="payment-date-badge" style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; font-size: 0.9rem; font-weight: 500; background: rgba(148, 163, 184, 0.1); color: #cbd5e1; border: 1px solid rgba(148, 163, 184, 0.2);">
+                    <i class="fa-solid fa-check" style="font-size: 0.85rem; color: #10b981;"></i> Paid
+                </span>
+            `;
+        } else {
+            rcvdDateHtml = `
+                <span style="color: var(--text-muted); font-size: 0.95rem; font-weight: 500;">-</span>
+            `;
+        }
+
+        div.innerHTML = `
+            <!-- Col 1: Student Name -->
+            <div class="player-info" style="display: flex; align-items: center; gap: 14px; min-width: 0; overflow: hidden;">
+                <div class="profile-pic" style="min-width: 50px; width: 50px; height: 50px; border-radius: 50%; ${avatarStyle}">
+                    ${student.pic ? '' : initial}
                 </div>
-                
-                <div style="display: flex; align-items: center; gap: 15px; flex: 1; justify-content: flex-end;">
-                    ${outstandingHtml}
-                    
-                    <div style="width: 1px; height: 30px; background: #374151; margin: 0 5px;"></div>
-                
-                <div style="color: #fff; font-size: 1.1rem; font-weight: bold; background: rgba(255,255,255,0.05); padding: 4px 10px; border-radius: 8px; display: flex; align-items: center; justify-content: center; width: 85px; gap: 4px;">
-                    ${amount ? amount : '0'} <span style="font-size: 0.75rem; color: var(--text-muted);">SAR</span>
+                <div style="min-width: 0; overflow: hidden;">
+                    <h3 style="font-size: 1.18rem; font-weight: 600; color: ${hasAttended ? (isPaid ? '#10b981' : '#ef4444') : (student.gender === 'Female' ? '#ec4899' : '#fff')}; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; margin: 0;">${escapeHtml(student.name)} ${student.age ? `<span class="player-age-badge" style="margin-left: 6px;">${student.age} Yrs</span>` : ''}</h3>
+                    <p style="font-size: 0.92rem; color: var(--text-muted); margin: 3px 0 0 0; white-space: nowrap; text-overflow: ellipsis; overflow: hidden;">ID: <strong style="color: #f1f5f9;">${escapeHtml(student.id)}</strong> | Parent: <strong style="color: #f1f5f9;">${escapeHtml(student.fatherName || 'N/A')}</strong></p>
                 </div>
-                <div style="padding: 8px 12px; font-size: 0.85rem; border-radius: 8px; font-weight: bold; width: 90px; text-align: center; display: flex; align-items: center; justify-content: center; gap: 6px; ${isPaid ? 'background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16,185,129,0.3);' : 'background: rgba(148, 163, 184, 0.1); color: #94a3b8; border: 1px solid rgba(148,163,184,0.2);'}">
+            </div>
+            
+            <!-- Col 2: Payment Rcvd Date -->
+            <div style="text-align: center; display: flex; align-items: center; justify-content: center;">
+                ${rcvdDateHtml}
+            </div>
+            
+            <!-- Col 3: Outstanding -->
+            <div style="text-align: center; display: flex; align-items: center; justify-content: center;">
+                ${outstandingHtml}
+            </div>
+            
+            <!-- Col 4: Amount -->
+            <div style="text-align: center; display: flex; align-items: center; justify-content: center;">
+                <div style="color: #fff; font-size: 1.15rem; font-weight: bold; background: rgba(255,255,255,0.06); padding: 6px 14px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; width: 85px; gap: 4px;">
+                    ${amount ? amount : '0'} <span style="font-size: 0.78rem; color: var(--text-muted);">SAR</span>
+                </div>
+            </div>
+            
+            <!-- Col 5: Status -->
+            <div style="text-align: center; display: flex; align-items: center; justify-content: center;">
+                <div style="padding: 8px 12px; font-size: 0.92rem; border-radius: 10px; font-weight: 600; width: 95px; text-align: center; display: inline-flex; align-items: center; justify-content: center; gap: 6px; ${isPaid ? 'background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16,185,129,0.3);' : 'background: rgba(148, 163, 184, 0.1); color: #94a3b8; border: 1px solid rgba(148,163,184,0.2);'}">
                     <i class="fa-solid ${isPaid ? 'fa-check-circle' : 'fa-minus-circle'}"></i> ${isPaid ? 'Paid' : 'Unpaid'}
                 </div>
-                ${student.whatsapp ? `<a href="https://web.whatsapp.com/send?phone=${student.whatsapp.replace(/\D/g, '')}&text=${encodedMessage}" target="_blank" class="btn-primary" style="display: flex; align-items: center; background: #25D366; border-color: #25D366; color: white; text-decoration: none; padding: 8px 15px; border-radius: 8px; font-size: 0.85rem; font-weight: bold; gap: 6px; transition: 0.2s;"><i class="fa-brands fa-whatsapp" style="font-size: 1.1rem;"></i> Message</a>` : ''}
+            </div>
+            
+            <!-- Col 6: Action -->
+            <div style="text-align: center; display: flex; align-items: center; justify-content: center;">
+                ${student.whatsapp ? `<a href="https://web.whatsapp.com/send?phone=${student.whatsapp.replace(/\D/g, '')}&text=${encodedMessage}" target="_blank" onclick="markWhatsappSent('${student.id}', '${monthStr}', this)" class="btn-primary" title="${isWaSent ? 'WhatsApp message already sent. Click to open again.' : 'Send WhatsApp Message'}" style="display: inline-flex; align-items: center; justify-content: center; width: 110px; ${isWaSent ? 'background: #eab308; border-color: #ca8a04; color: #0f172a;' : 'background: #25D366; border-color: #25D366; color: white;'} text-decoration: none; padding: 9px 12px; border-radius: 10px; font-size: 0.92rem; font-weight: 600; gap: 6px; transition: 0.2s;"><i class="fa-brands fa-whatsapp" style="font-size: 1.1rem; ${isWaSent ? 'color: #0f172a;' : ''}"></i> ${isWaSent ? 'Sent' : 'Message'}</a>` : ''}
             </div>
         `;
         list.appendChild(div);
@@ -2146,16 +2298,23 @@ function updateFeeAmount(studentId, monthStr, amountVal) {
 
 function togglePaymentStatus(studentId, monthStr) {
     let payment = getAcademyPaymentForMonth(monthStr, studentId);
+    const exactDate = new Date().toISOString().split('T')[0];
     
     if(payment) {
         payment.status = payment.status === 'Paid' ? 'Unpaid' : 'Paid';
+        if (payment.status === 'Paid') {
+            payment.date = exactDate;
+        } else {
+            payment.date = null;
+        }
     } else {
         academyPayments.push({
             month: monthStr,
             studentId: studentId,
             amount: 0,
             paid: 0,
-            status: 'Paid'
+            status: 'Paid',
+            date: exactDate
         });
     }
     saveData();
@@ -2228,13 +2387,12 @@ function togglePaymentStatusFromAttendance(studentId, monthStr) {
     
     let payment = getAcademyPaymentForMonth(monthStr, studentId);
     if(payment) {
-        if (payment.status !== 'Paid') {
-            payment.status = 'Paid';
-            payment.amount = amount;
-            payment.paid = amount;
-            if (!payment.history) payment.history = [];
-            payment.history.push({ date: exactDate, amount: amount });
-        }
+        payment.status = 'Paid';
+        payment.amount = amount;
+        payment.paid = amount;
+        payment.date = exactDate;
+        if (!payment.history) payment.history = [];
+        payment.history.push({ date: exactDate, amount: amount });
     } else {
         academyPayments.push({
             month: monthStr,
@@ -2242,12 +2400,14 @@ function togglePaymentStatusFromAttendance(studentId, monthStr) {
             amount: amount,
             paid: amount,
             status: 'Paid',
+            date: exactDate,
             history: [{ date: exactDate, amount: amount }]
         });
     }
     saveData();
     renderAcademyAttendance();
     if(document.getElementById('view-academy-accounts').classList.contains('active')) renderAcademyAccounts();
+    if(document.getElementById('view-academy-payments').classList.contains('active')) renderAcademyPayments();
 }
 
 function payOutstanding(studentId, monthStr, outstandingAmount) {
@@ -2263,6 +2423,7 @@ function payOutstanding(studentId, monthStr, outstandingAmount) {
             amount: outstandingAmount,
             paid: outstandingAmount,
             status: 'Paid',
+            date: exactDate,
             history: [{ date: exactDate, amount: outstandingAmount }]
         });
     } else {
@@ -2271,6 +2432,7 @@ function payOutstanding(studentId, monthStr, outstandingAmount) {
         payment.amount = newTotal;
         payment.paid = newTotal;
         payment.status = 'Paid';
+        payment.date = exactDate;
         if (!payment.history) payment.history = [];
         payment.history.push({ date: exactDate, amount: outstandingAmount });
     }
@@ -2316,15 +2478,15 @@ function renderAcademyReports() {
 
     let thead = `
         <thead>
-            <tr style="border-bottom: 2px solid #374151; background: rgba(15, 23, 42, 0.5);">
-                <th style="padding: 12px; font-weight: 600;">Student Name</th>
-                <th style="padding: 12px; font-weight: 600; text-align: center;">Total Present</th>
-                <th style="padding: 12px; font-weight: 600; text-align: center;">Total Absent</th>
-                <th style="padding: 12px; font-weight: 600; text-align: center;">Payment</th>
+            <tr style="border-bottom: 2px solid #374151; background: rgba(15, 23, 42, 0.7);">
+                <th style="padding: 14px 16px; font-weight: 600; font-size: 0.95rem;">Student Name</th>
+                <th style="padding: 14px 16px; font-weight: 600; font-size: 0.95rem; text-align: center;">Total Present</th>
+                <th style="padding: 14px 16px; font-weight: 600; font-size: 0.95rem; text-align: center;">Total Absent</th>
+                <th style="padding: 14px 16px; font-weight: 600; font-size: 0.95rem; text-align: center;">Payment</th>
     `;
     activeDays.forEach(d => {
         const fullDate = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-        thead += `<th style="padding: 12px; font-weight: 600; text-align: center; white-space: nowrap;">${fullDate}</th>`;
+        thead += `<th style="padding: 14px 16px; font-weight: 600; font-size: 0.95rem; text-align: center; white-space: nowrap;">${fullDate}</th>`;
     });
     thead += `</tr></thead>`;
     
@@ -2341,12 +2503,12 @@ function renderAcademyReports() {
     });
     
     if(studentsToRender.length === 0) {
-        tbody += `<tr><td colspan="${5 + activeDays.length}" style="padding: 20px; text-align: center; color: var(--text-muted);">No students registered.</td></tr>`;
+        tbody += `<tr><td colspan="${5 + activeDays.length}" style="padding: 24px; text-align: center; color: var(--text-muted); font-size: 1rem;">No students registered.</td></tr>`;
     } else {
         studentsToRender.forEach(student => {
             const payment = getAcademyPaymentForMonth(monthStr, student.id);
             const isPaid = payment && payment.status === 'Paid';
-            const payText = student.role === 'coach' ? `<span style="color: #9ca3af;">N/A</span>` : (isPaid ? `<span style="color: #10b981;">Paid (${payment.amount || 0})</span>` : `<span style="color: #ef4444;">Unpaid</span>`);
+            const payText = student.role === 'coach' ? `<span style="color: #9ca3af;">N/A</span>` : (isPaid ? `<span style="color: #10b981; font-weight: 600;">Paid (${payment.amount || 0})</span>` : `<span style="color: #ef4444; font-weight: 600;">Unpaid</span>`);
             
             let totalPresent = 0;
             let totalAbsent = 0;
@@ -2369,20 +2531,20 @@ function renderAcademyReports() {
                         totalAbsent++;
                     }
                 }
-                daysHtml += `<td style="padding: 12px; text-align: center; color: ${color}; font-weight: bold;">${dayStatus}</td>`;
+                daysHtml += `<td style="padding: 14px 16px; font-size: 0.95rem; text-align: center; color: ${color}; font-weight: bold;">${dayStatus}</td>`;
             });
             
             tbody += `
                 <tr style="border-bottom: 1px solid #374151;">
-                    <td style="padding: 12px; color: ${student.role === 'coach' ? '#3b82f6' : 'inherit'}; font-weight: ${student.role === 'coach' ? 'bold' : 'normal'};">
-                        <a href="#" onclick="viewStudentReportHistory('${student.id}'); return false;" style="color: inherit; text-decoration: underline;">
+                    <td style="padding: 14px 16px; font-size: 0.95rem; color: ${student.role === 'coach' ? '#3b82f6' : 'inherit'}; font-weight: ${student.role === 'coach' ? 'bold' : 'normal'};">
+                        <a href="#" onclick="viewStudentReportHistory('${student.id}'); return false;" style="color: inherit; text-decoration: underline; font-size: 1.02rem; font-weight: 600;">
                             ${escapeHtml(student.name)}
                         </a>
-                        ${student.role === 'coach' ? '<span style="font-size: 0.75rem; background: rgba(59,130,246,0.2); color: #3b82f6; padding: 2px 6px; border-radius: 4px; margin-left: 4px; vertical-align: middle;">Coach</span>' : `<br><span style="font-size: 0.75rem; color: #9ca3af;">Parent: ${escapeHtml(student.fatherName || 'N/A')}</span>`}
+                        ${student.role === 'coach' ? '<span style="font-size: 0.8rem; background: rgba(59,130,246,0.2); color: #3b82f6; padding: 2px 6px; border-radius: 4px; margin-left: 4px; vertical-align: middle;">Coach</span>' : `<br><span style="font-size: 0.85rem; color: #94a3b8;">Parent: ${escapeHtml(student.fatherName || 'N/A')}</span>`}
                     </td>
-                    <td style="padding: 12px; text-align: center; color: #10b981;">${totalPresent}</td>
-                    <td style="padding: 12px; text-align: center; color: #ef4444;">${totalAbsent}</td>
-                    <td style="padding: 12px; text-align: center;">${payText}</td>
+                    <td style="padding: 14px 16px; font-size: 0.95rem; text-align: center; color: #10b981; font-weight: 600;">${totalPresent}</td>
+                    <td style="padding: 14px 16px; font-size: 0.95rem; text-align: center; color: #ef4444; font-weight: 600;">${totalAbsent}</td>
+                    <td style="padding: 14px 16px; font-size: 0.95rem; text-align: center;">${payText}</td>
                     ${daysHtml}
                 </tr>
             `;
@@ -2539,14 +2701,14 @@ function renderAcademyAccounts() {
     if (totalFees > 0) {
         totalIncome += totalFees;
         list.innerHTML += `
-            <div class="player-card" style="display: flex; align-items: center; padding: 12px 20px; border-radius: 8px; margin-bottom: 8px; background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.2);">
-                <div style="width: 120px; color: var(--text-muted); font-size: 0.85rem;">${monthStr}-Auto</div>
-                <div style="flex: 1; min-width: 200px; color: #fff; font-weight: bold;">
-                    <i class="fa-solid fa-graduation-cap" style="color: #10b981; margin-right: 8px;"></i>Student Fee Collections
+            <div class="player-card" style="display: flex; align-items: center; padding: 15px 22px; border-radius: 12px; margin-bottom: 10px; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25);">
+                <div style="width: 140px; color: var(--text-muted); font-size: 0.95rem; font-weight: 500;">${monthStr}-Auto</div>
+                <div style="flex: 1; min-width: 200px; color: #fff; font-weight: 600; font-size: 1.05rem;">
+                    <i class="fa-solid fa-graduation-cap" style="color: #10b981; margin-right: 10px;"></i>Student Fee Collections
                 </div>
-                <div style="width: 120px; text-align: right; color: #10b981; font-weight: bold;">${totalFees} SAR</div>
-                <div style="width: 120px; text-align: right; color: #ef4444;">-</div>
-                <div style="width: 60px; text-align: center;"><i class="fa-solid fa-lock" style="color: var(--text-muted);" title="Auto-calculated"></i></div>
+                <div style="width: 130px; text-align: right; color: #10b981; font-weight: 700; font-size: 1.05rem;">${totalFees} SAR</div>
+                <div style="width: 130px; text-align: right; color: #ef4444; font-size: 1.05rem;">-</div>
+                <div style="width: 60px; text-align: center;"><i class="fa-solid fa-lock" style="color: var(--text-muted); font-size: 1rem;" title="Auto-calculated"></i></div>
             </div>
         `;
     }
@@ -2554,7 +2716,7 @@ function renderAcademyAccounts() {
     const monthEntries = academyAccounts.filter(acc => acc.date.startsWith(monthStr)).sort((a,b) => new Date(a.date) - new Date(b.date));
     
     if (monthEntries.length === 0 && totalFees === 0) {
-        list.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 20px;">No transactions found for this month.</p>';
+        list.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 25px; font-size: 1rem;">No transactions found for this month.</p>';
     }
 
     monthEntries.forEach(entry => {
@@ -2567,13 +2729,13 @@ function renderAcademyAccounts() {
 
         const isInc = entry.type === 'income';
         list.innerHTML += `
-            <div class="player-card" style="display: flex; align-items: center; padding: 12px 20px; border-radius: 8px; margin-bottom: 8px; background: rgba(15, 23, 42, 0.8); border: 1px solid #374151;">
-                <div style="width: 120px; color: var(--text-muted); font-size: 0.85rem;">${escapeHtml(entry.date)}</div>
-                <div style="flex: 1; min-width: 200px; color: #fff;">${escapeHtml(entry.description)}</div>
-                <div style="width: 120px; text-align: right; color: #10b981; font-weight: bold;">${isInc ? amount + ' SAR' : '-'}</div>
-                <div style="width: 120px; text-align: right; color: #ef4444; font-weight: bold;">${!isInc ? amount + ' SAR' : '-'}</div>
+            <div class="player-card" style="display: flex; align-items: center; padding: 15px 22px; border-radius: 12px; margin-bottom: 10px; background: rgba(15, 23, 42, 0.8); border: 1px solid #374151;">
+                <div style="width: 140px; color: var(--text-muted); font-size: 0.95rem; font-weight: 500;">${escapeHtml(entry.date)}</div>
+                <div style="flex: 1; min-width: 200px; color: #fff; font-size: 1.02rem;">${escapeHtml(entry.description)}</div>
+                <div style="width: 130px; text-align: right; color: #10b981; font-weight: 700; font-size: 1.05rem;">${isInc ? amount + ' SAR' : '-'}</div>
+                <div style="width: 130px; text-align: right; color: #ef4444; font-weight: 700; font-size: 1.05rem;">${!isInc ? amount + ' SAR' : '-'}</div>
                 <div style="width: 60px; text-align: center;">
-                    <button class="btn-secondary" style="padding: 4px 8px; font-size: 0.75rem; border-color: #ef4444; color: #ef4444;" onclick="deleteAccountEntry('${entry.id}')">
+                    <button class="btn-secondary" style="padding: 6px 10px; font-size: 0.85rem; border-color: #ef4444; color: #ef4444;" onclick="deleteAccountEntry('${entry.id}')">
                         <i class="fa-solid fa-trash"></i>
                     </button>
                 </div>
@@ -2953,18 +3115,26 @@ function renderAcademyApprovals() {
         div.style.display = 'flex';
         div.style.alignItems = 'center';
         div.style.justifyContent = 'space-between';
+        div.style.padding = '16px 22px';
         
+        const initial = student.name ? student.name.trim().charAt(0).toUpperCase() : 'S';
+        const avatarStyle = student.pic 
+            ? `background-image: url('${student.pic}');` 
+            : `background: linear-gradient(135deg, #1e3a8a, #2563eb);`;
+
         div.innerHTML = `
-            <div class="player-info">
-                <div class="profile-pic" style="${student.pic ? `background-image: url('${student.pic}');` : ''}"></div>
+            <div class="player-info" style="display: flex; align-items: center; gap: 16px;">
+                <div class="profile-pic" style="min-width: 50px; height: 50px; ${avatarStyle}">
+                    ${student.pic ? '' : initial}
+                </div>
                 <div>
-                    <h3 style="font-size: 1.1rem; color: #fff;">${escapeHtml(student.name)}</h3>
-                    <p style="font-size: 0.85rem; color: var(--text-muted);">ID: ${escapeHtml(student.id)} | Requested by: ${escapeHtml(student.pendingDeletionBy || 'Unknown')}</p>
+                    <h3 style="font-size: 1.25rem; font-weight: 600; color: #fff; margin-bottom: 4px;">${escapeHtml(student.name)}</h3>
+                    <p style="font-size: 0.95rem; color: var(--text-muted);">ID: <strong style="color: #f1f5f9;">${escapeHtml(student.id)}</strong> | Requested by: <span style="color: #fca5a5;">${escapeHtml(student.pendingDeletionBy || 'Unknown')}</span></p>
                 </div>
             </div>
             <div style="display: flex; gap: 10px;">
-                <button class="btn-primary" style="background: #ef4444; border-color: #ef4444;" onclick="approveDeletion('${student.id}')"><i class="fa-solid fa-check"></i> Approve Delete</button>
-                <button class="btn-secondary" onclick="rejectDeletion('${student.id}')"><i class="fa-solid fa-xmark"></i> Reject</button>
+                <button class="btn-primary" style="background: #ef4444; border-color: #ef4444; padding: 10px 18px; font-size: 0.95rem; font-weight: 600;" onclick="approveDeletion('${student.id}')"><i class="fa-solid fa-check"></i> Approve Delete</button>
+                <button class="btn-secondary" style="padding: 10px 18px; font-size: 0.95rem; font-weight: 600;" onclick="rejectDeletion('${student.id}')"><i class="fa-solid fa-xmark"></i> Reject</button>
             </div>
         `;
         list.appendChild(div);
@@ -2997,60 +3167,290 @@ let chartPnL = null;
 let chartAge = null;
 let chartAttendance = null;
 
+function changeDashboardMonth(delta) {
+    const picker = document.getElementById('dashboard-month-picker');
+    let monthStr = picker ? picker.value : '';
+    if (!monthStr) {
+        const today = new Date();
+        monthStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+    }
+    const [year, month] = monthStr.split('-').map(Number);
+    const targetDate = new Date(year, month - 1 + delta, 1);
+    const newMonthStr = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}`;
+    if (picker) picker.value = newMonthStr;
+    renderAcademyDashboard();
+}
+
+function resetDashboardMonth() {
+    const picker = document.getElementById('dashboard-month-picker');
+    const today = new Date();
+    const currentMonthStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+    if (picker) picker.value = currentMonthStr;
+    renderAcademyDashboard();
+}
+
+const DASHBOARD_AGE_BRACKETS = [
+    { id: 'under-6', label: 'Under 6', chartLabel: 'Under 6' },
+    { id: '6-7', label: 'Between 6 to 7', chartLabel: '6 - 7 Yrs' },
+    { id: '8-9', label: 'Between 8 to 9', chartLabel: '8 - 9 Yrs' },
+    { id: '10-11', label: 'Between 10 to 11', chartLabel: '10 - 11 Yrs' },
+    { id: '12-13', label: 'Between 12 to 13', chartLabel: '12 - 13 Yrs' },
+    { id: '14-15', label: 'Between 14 to 15', chartLabel: '14 - 15 Yrs' },
+    { id: '16-plus', label: '16 and Above', chartLabel: '16+ Yrs' }
+];
+
+function getStudentAgeCategoryId(student) {
+    if (!student || student.role === 'coach') return null;
+    if (!student.age || student.age === '-' || isNaN(parseInt(student.age))) {
+        return 'unknown';
+    }
+    const age = parseInt(student.age);
+    if (age < 6) return 'under-6';
+    if (age >= 6 && age <= 7) return '6-7';
+    if (age >= 8 && age <= 9) return '8-9';
+    if (age >= 10 && age <= 11) return '10-11';
+    if (age >= 12 && age <= 13) return '12-13';
+    if (age >= 14 && age <= 15) return '14-15';
+    if (age >= 16) return '16-plus';
+    return 'unknown';
+}
+
 function renderAcademyDashboard() {
     if (chartPnL) chartPnL.destroy();
     if (chartAge) chartAge.destroy();
     if (chartAttendance) chartAttendance.destroy();
     
-    // 1. P&L Current Month Pie Chart
-    const today = new Date();
-    const monthStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+    // Determine selected month from calendar input
+    const picker = document.getElementById('dashboard-month-picker');
+    let monthStr = picker ? picker.value : '';
+    if (!monthStr) {
+        const today = new Date();
+        monthStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+        if (picker) picker.value = monthStr;
+    }
     
+    // Parse month date for human-readable title (e.g. "October 2026")
+    const [selYear, selMonth] = monthStr.split('-').map(Number);
+    const monthDateObj = new Date(selYear, selMonth - 1, 1);
+    const monthDisplayName = monthDateObj.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+    const monthShortName = monthDateObj.toLocaleString('en-US', { month: 'short' });
+
+    // Update dynamic header labels
+    const pnlMonthLabel = document.getElementById('dash-pnl-title-month');
+    if (pnlMonthLabel) pnlMonthLabel.innerText = monthDisplayName;
+    
+    const attMonthLabel = document.getElementById('dash-att-title-month');
+    if (attMonthLabel) attMonthLabel.innerText = monthDisplayName;
+
+    // 1. Calculate P&L for Selected Month
     let totalIncome = 0;
     let totalExpense = 0;
     academyPayments.forEach(p => {
-        if(p.month === monthStr && p.status === 'Paid') {
-            totalIncome += parseFloat(p.amount) || 0;
+        if(p.month === monthStr && (p.status === 'Paid' || p.status === 'paid')) {
+            totalIncome += parseFloat(p.amount) || parseFloat(p.paid) || 0;
         }
     });
     academyAccounts.forEach(acc => {
-        if(acc.date.startsWith(monthStr)) {
-            if(acc.type === 'Income' || acc.type === 'income') totalIncome += parseFloat(acc.amount) || 0;
-            if(acc.type === 'Expense' || acc.type === 'expense') totalExpense += parseFloat(acc.amount) || 0;
+        if(acc.date && acc.date.startsWith(monthStr)) {
+            const type = (acc.type || '').toLowerCase();
+            if(type === 'income') totalIncome += parseFloat(acc.amount) || 0;
+            if(type === 'expense') totalExpense += parseFloat(acc.amount) || 0;
         }
     });
-    
+
+    const netProfit = totalIncome - totalExpense;
+
+    // 2. Calculate Attendance for Selected Month
+    const dateStats = {};
+    let monthPresentCount = 0;
+    academyAttendance.forEach(a => {
+        if(a.status === 'Present' && a.date && a.date.startsWith(monthStr)) {
+            dateStats[a.date] = (dateStats[a.date] || 0) + 1;
+            monthPresentCount++;
+        }
+    });
+    let attDates = Object.keys(dateStats).sort();
+
+    // 3. Update Monthly KPI Stat Cards
+    const elIncome = document.getElementById('dash-stat-income');
+    if (elIncome) elIncome.innerText = `${totalIncome.toLocaleString()} SAR`;
+
+    const elExpense = document.getElementById('dash-stat-expense');
+    if (elExpense) elExpense.innerText = `${totalExpense.toLocaleString()} SAR`;
+
+    const elNet = document.getElementById('dash-stat-net');
+    if (elNet) {
+        const netSign = netProfit > 0 ? '+' : '';
+        elNet.innerText = `${netSign}${netProfit.toLocaleString()} SAR`;
+        elNet.style.color = netProfit >= 0 ? '#10b981' : '#ef4444';
+    }
+
+    const elAtt = document.getElementById('dash-stat-attendance');
+    if (elAtt) elAtt.innerText = `${monthPresentCount} Check-ins`;
+
+    // 4. Render P&L Donut Chart for Selected Month
+    const hasData = (totalIncome > 0 || totalExpense > 0);
+    const pnlData = hasData ? [totalIncome, totalExpense] : [1];
+    const pnlLabels = hasData ? ['Income', 'Expense'] : ['No Transactions'];
+    const pnlColors = hasData ? ['#10b981', '#ef4444'] : ['#334155'];
+    const pnlHoverColors = hasData ? ['#059669', '#dc2626'] : ['#475569'];
+
+    // Center text plugin for doughnut chart
+    const donutCenterTextPlugin = {
+        id: 'donutCenterText',
+        beforeDraw(chart) {
+            const { ctx, chartArea } = chart;
+            if (!chartArea) return;
+            const centerX = (chartArea.left + chartArea.right) / 2;
+            const centerY = (chartArea.top + chartArea.bottom) / 2;
+            
+            ctx.save();
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            
+            const sign = netProfit > 0 ? '+' : '';
+            const netStr = `${sign}${netProfit.toLocaleString()} SAR`;
+            
+            ctx.font = "600 11px 'Outfit', sans-serif";
+            ctx.fillStyle = '#94a3b8';
+            ctx.fillText('NET BALANCE', centerX, centerY - 11);
+            
+            ctx.font = "700 16px 'Outfit', sans-serif";
+            ctx.fillStyle = netProfit > 0 ? '#10b981' : (netProfit < 0 ? '#ef4444' : '#e2e8f0');
+            ctx.fillText(netStr, centerX, centerY + 12);
+            ctx.restore();
+        }
+    };
+
     const ctxPnL = document.getElementById('chart-pnl');
     if(ctxPnL) {
         chartPnL = new Chart(ctxPnL, {
-            type: 'pie',
+            type: 'doughnut',
             data: {
-                labels: ['Income', 'Expense'],
+                labels: pnlLabels,
                 datasets: [{
-                    data: [totalIncome, totalExpense],
-                    backgroundColor: ['#10b981', '#ef4444'],
-                    borderWidth: 0
+                    data: pnlData,
+                    backgroundColor: pnlColors,
+                    hoverBackgroundColor: pnlHoverColors,
+                    borderColor: '#1f2937',
+                    borderWidth: 3,
+                    hoverOffset: 4
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                plugins: { legend: { labels: { color: '#fff' } } }
-            }
+                cutout: '70%',
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            color: '#e2e8f0',
+                            font: { size: 13, family: "'Outfit', sans-serif", weight: '600' },
+                            padding: 16,
+                            usePointStyle: true,
+                            pointStyle: 'circle'
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                if (!hasData) return ` No transactions for ${monthDisplayName}`;
+                                const val = context.parsed || 0;
+                                return ` ${context.label}: ${val.toLocaleString()} SAR`;
+                            }
+                        }
+                    }
+                }
+            },
+            plugins: [donutCenterTextPlugin]
         });
     }
 
-    // 2. Age Distribution (Bar chart)
-    const ageCounts = {};
-    academyStudents.forEach(s => {
-        const age = s.age && s.age !== '-' ? parseInt(s.age) : 'Unknown';
-        if(s.role !== 'coach') {
-            ageCounts[age] = (ageCounts[age] || 0) + 1;
+    // Populate P&L Breakdown below Donut Chart
+    const pnlBreakdownEl = document.getElementById('dashboard-pnl-breakdown');
+    if (pnlBreakdownEl) {
+        let feeIncome = 0;
+        academyPayments.forEach(p => {
+            if(p.month === monthStr && (p.status === 'Paid' || p.status === 'paid')) {
+                feeIncome += parseFloat(p.amount) || parseFloat(p.paid) || 0;
+            }
+        });
+        let otherIncome = 0;
+        let otherExpense = 0;
+        academyAccounts.forEach(acc => {
+            if(acc.date && acc.date.startsWith(monthStr)) {
+                const type = (acc.type || '').toLowerCase();
+                if(type === 'income') otherIncome += parseFloat(acc.amount) || 0;
+                if(type === 'expense') otherExpense += parseFloat(acc.amount) || 0;
+            }
+        });
+
+        pnlBreakdownEl.innerHTML = `
+            <div class="pnl-breakdown-row">
+                <span class="pnl-breakdown-label"><i class="fa-solid fa-graduation-cap" style="color: #10b981;"></i> Student Fees</span>
+                <span class="pnl-breakdown-val" style="color: #10b981;">${feeIncome.toLocaleString()} SAR</span>
+            </div>
+            <div class="pnl-breakdown-row">
+                <span class="pnl-breakdown-label"><i class="fa-solid fa-money-bill-transfer" style="color: #38bdf8;"></i> Other Income</span>
+                <span class="pnl-breakdown-val" style="color: #38bdf8;">${otherIncome.toLocaleString()} SAR</span>
+            </div>
+            <div class="pnl-breakdown-row">
+                <span class="pnl-breakdown-label"><i class="fa-solid fa-receipt" style="color: #ef4444;"></i> Expenses</span>
+                <span class="pnl-breakdown-val" style="color: #ef4444;">${otherExpense.toLocaleString()} SAR</span>
+            </div>
+        `;
+    }
+
+    // 5. Age Distribution (Bar chart and Dropdown by Age Brackets)
+    const categoryCounts = {};
+    DASHBOARD_AGE_BRACKETS.forEach(b => { categoryCounts[b.id] = 0; });
+    let unknownAgeCount = 0;
+
+    const nonCoachStudents = academyStudents.filter(s => s.role !== 'coach');
+    nonCoachStudents.forEach(s => {
+        const catId = getStudentAgeCategoryId(s);
+        if (catId === 'unknown') {
+            unknownAgeCount++;
+        } else if (catId && categoryCounts.hasOwnProperty(catId)) {
+            categoryCounts[catId]++;
         }
     });
-    const sortedAges = Object.keys(ageCounts).sort((a,b) => (a==='Unknown'?999:parseInt(a)) - (b==='Unknown'?999:parseInt(b)));
-    const ageLabels = sortedAges.map(a => a === 'Unknown' ? 'Unknown' : a + ' Yrs');
-    const ageData = sortedAges.map(a => ageCounts[a]);
+
+    const activeBrackets = [...DASHBOARD_AGE_BRACKETS];
+    if (unknownAgeCount > 0) {
+        activeBrackets.push({ id: 'unknown', label: 'Unknown Age', chartLabel: 'Unknown' });
+        categoryCounts['unknown'] = unknownAgeCount;
+    }
+
+    const ageLabels = activeBrackets.map(b => b.chartLabel);
+    const ageData = activeBrackets.map(b => categoryCounts[b.id] || 0);
+    const maxAgeCount = Math.max(...ageData, 0);
+
+    // Number text plugin above each age bar
+    const ageBarTextCountPlugin = {
+        id: 'ageBarTextCount',
+        afterDatasetsDraw(chart) {
+            const { ctx } = chart;
+            chart.data.datasets.forEach((dataset, datasetIndex) => {
+                const meta = chart.getDatasetMeta(datasetIndex);
+                if (!meta || !meta.data) return;
+                
+                meta.data.forEach((bar, index) => {
+                    const count = dataset.data[index];
+                    if (count > 0) {
+                        ctx.save();
+                        ctx.font = "bold 12px 'Outfit', sans-serif";
+                        ctx.fillStyle = '#38bdf8';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'bottom';
+                        ctx.fillText(`${count}`, bar.x, bar.y - 4);
+                        ctx.restore();
+                    }
+                });
+            });
+        }
+    };
 
     const ctxAge = document.getElementById('chart-age');
     if(ctxAge) {
@@ -3061,54 +3461,385 @@ function renderAcademyDashboard() {
                 datasets: [{
                     label: 'Students',
                     data: ageData,
-                    backgroundColor: '#38bdf8'
+                    backgroundColor: '#38bdf8',
+                    hoverBackgroundColor: '#0284c7',
+                    borderRadius: 6,
+                    borderSkipped: false,
+                    maxBarThickness: 45
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                scales: {
-                    y: { beginAtZero: true, ticks: { color: '#9ca3af', stepSize: 1, precision: 0 } },
-                    x: { ticks: { color: '#9ca3af' } }
+                layout: {
+                    padding: { top: 22 }
                 },
-                plugins: { legend: { display: false } }
-            }
+                onClick: (event, elements) => {
+                    if (elements && elements.length > 0) {
+                        const elementIndex = elements[0].index;
+                        const bracket = activeBrackets[elementIndex];
+                        if (bracket) {
+                            const selectEl = document.getElementById('dashboard-age-select');
+                            if (selectEl) {
+                                selectEl.value = bracket.id;
+                                renderDashboardAgeStudents();
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: { 
+                        beginAtZero: true, 
+                        suggestedMax: Math.max(5, maxAgeCount + 4),
+                        ticks: { color: '#9ca3af', stepSize: 5, precision: 0 },
+                        grid: { color: 'rgba(255, 255, 255, 0.06)' }
+                    },
+                    x: { 
+                        ticks: { color: '#9ca3af', font: { size: 12, family: "'Outfit', sans-serif" } },
+                        grid: { display: false }
+                    }
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            title: (tooltipItems) => {
+                                const idx = tooltipItems[0].dataIndex;
+                                return activeBrackets[idx] ? activeBrackets[idx].label : '';
+                            },
+                            label: (context) => {
+                                const count = context.parsed.y || 0;
+                                return ` ${count} Student${count === 1 ? '' : 's'}`;
+                            }
+                        }
+                    }
+                }
+            },
+            plugins: [ageBarTextCountPlugin]
         });
     }
 
-    // 3. Attendance History (Bar chart)
-    const dateStats = {};
-    academyAttendance.forEach(a => {
-        if(a.status === 'Present') {
-            dateStats[a.date] = (dateStats[a.date] || 0) + 1;
+    // Populate Age Dropdown List
+    const ageSelect = document.getElementById('dashboard-age-select');
+    if (ageSelect) {
+        const currentSelected = ageSelect.value || 'all';
+        
+        let optionsHtml = `<option value="all">All Ages (${nonCoachStudents.length} Students)</option>`;
+        activeBrackets.forEach(b => {
+            const count = categoryCounts[b.id] || 0;
+            optionsHtml += `<option value="${b.id}">${b.label} (${count} Student${count === 1 ? '' : 's'})</option>`;
+        });
+        ageSelect.innerHTML = optionsHtml;
+        
+        const validValues = ['all', ...activeBrackets.map(b => b.id)];
+        if (validValues.includes(currentSelected)) {
+            ageSelect.value = currentSelected;
+        } else {
+            ageSelect.value = 'all';
         }
-    });
-    let attDates = Object.keys(dateStats).sort();
-    if(attDates.length > 14) attDates = attDates.slice(-14);
+    }
+    renderDashboardAgeStudents();
+
+
+    // 6. Attendance History (Bar chart for Selected Month with on-bar text count)
+    let attLabels = [];
+    let attData = [];
+    if (attDates.length === 0) {
+        attLabels = [`No Sessions in ${monthShortName}`];
+        attData = [0];
+    } else {
+        attLabels = attDates.map(d => {
+            const parts = d.split('-');
+            if(parts.length === 3) {
+                const dObj = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+                const dayName = dObj.toLocaleDateString('en-US', { weekday: 'short' });
+                return `${dayName}, ${monthShortName} ${parts[2]}`;
+            }
+            return d;
+        });
+        attData = attDates.map(d => dateStats[d]);
+    }
     
-    const attData = attDates.map(d => dateStats[d]);
-    
+    const maxAtt = Math.max(...attData, 0);
+    const suggestedMaxY = Math.max(5, maxAtt + 2);
+
+    // Custom plugin to display the exact text count directly on top of each bar
+    const attendanceBarTextCountPlugin = {
+        id: 'attendanceBarTextCount',
+        afterDatasetsDraw(chart) {
+            if (attDates.length === 0) return;
+            const { ctx } = chart;
+            chart.data.datasets.forEach((dataset, datasetIndex) => {
+                const meta = chart.getDatasetMeta(datasetIndex);
+                if (!meta || !meta.data) return;
+                
+                meta.data.forEach((bar, index) => {
+                    const count = dataset.data[index];
+                    if (count !== undefined && count !== null) {
+                        ctx.save();
+                        const text = `${count} Present`;
+                        ctx.font = "bold 13px 'Outfit', sans-serif";
+                        const textWidth = ctx.measureText(text).width;
+                        const pillW = textWidth + 18;
+                        const pillH = 24;
+                        const pillX = bar.x - pillW / 2;
+                        const pillY = Math.max(8, bar.y - pillH - 6);
+
+                        // Pill background
+                        ctx.fillStyle = '#0f172a';
+                        ctx.beginPath();
+                        if (ctx.roundRect) {
+                            ctx.roundRect(pillX, pillY, pillW, pillH, 6);
+                        } else {
+                            ctx.rect(pillX, pillY, pillW, pillH);
+                        }
+                        ctx.fill();
+
+                        // Pill light red border
+                        ctx.strokeStyle = '#f87171';
+                        ctx.lineWidth = 1.5;
+                        ctx.stroke();
+
+                        // Count text
+                        ctx.fillStyle = '#fca5a5';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText(text, bar.x, pillY + pillH / 2);
+                        ctx.restore();
+                    }
+                });
+            });
+        }
+    };
+
     const ctxAtt = document.getElementById('chart-attendance');
     if(ctxAtt) {
         chartAttendance = new Chart(ctxAtt, {
             type: 'bar',
             data: {
-                labels: attDates,
+                labels: attLabels,
                 datasets: [{
                     label: 'Total Present',
                     data: attData,
-                    backgroundColor: '#10b981'
+                    backgroundColor: '#f87171',
+                    hoverBackgroundColor: '#ef4444',
+                    borderRadius: 8,
+                    borderSkipped: false,
+                    maxBarThickness: 50,
+                    barPercentage: 0.5,
+                    categoryPercentage: 0.5
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                scales: {
-                    y: { beginAtZero: true, ticks: { color: '#9ca3af', stepSize: 1, precision: 0 } },
-                    x: { ticks: { color: '#9ca3af' } }
+                layout: {
+                    padding: {
+                        top: 32,
+                        left: 12,
+                        right: 12,
+                        bottom: 4
+                    }
                 },
-                plugins: { legend: { display: false } }
-            }
+                scales: {
+                    y: { 
+                        beginAtZero: true, 
+                        suggestedMax: suggestedMaxY,
+                        ticks: { color: '#9ca3af', stepSize: 1, precision: 0 },
+                        grid: { color: 'rgba(255, 255, 255, 0.08)' }
+                    },
+                    x: { 
+                        ticks: { 
+                            color: '#ffffff', 
+                            font: { size: 12.5, weight: '600', family: "'Outfit', sans-serif" } 
+                        },
+                        grid: { display: false }
+                    }
+                },
+                plugins: { 
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: '#0f172a',
+                        titleColor: '#ffffff',
+                        bodyColor: '#fca5a5',
+                        borderColor: '#f87171',
+                        borderWidth: 1,
+                        padding: 10,
+                        callbacks: {
+                            label: function(context) {
+                                return ` Present: ${context.parsed.y || context.parsed || 0} students`;
+                            }
+                        }
+                    }
+                }
+            },
+            plugins: [attendanceBarTextCountPlugin]
         });
     }
+
+    // 7. Render Date-Wise Attendance Breakdown below the chart
+    const breakdownEl = document.getElementById('dashboard-attendance-breakdown');
+    if (breakdownEl) {
+        if (attDates.length === 0) {
+            breakdownEl.innerHTML = `
+                <div style="text-align: center; color: var(--text-muted); padding: 18px 0; font-size: 0.92rem;">
+                    <i class="fa-regular fa-calendar-xmark" style="font-size: 1.4rem; display: block; margin-bottom: 6px; opacity: 0.6;"></i>
+                    No attendance sessions recorded for ${monthDisplayName}.
+                </div>
+            `;
+        } else {
+            const totalStudents = academyStudents.filter(s => s.role !== 'coach').length;
+            let rowsHtml = '';
+            
+            attDates.forEach(d => {
+                const count = dateStats[d] || 0;
+                const pct = totalStudents > 0 ? Math.round((count / totalStudents) * 100) : 0;
+                
+                const parts = d.split('-');
+                let dateDisplay = d;
+                let dayDisplay = '';
+                if (parts.length === 3) {
+                    const dObj = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+                    dayDisplay = dObj.toLocaleDateString('en-US', { weekday: 'long' });
+                    dateDisplay = `${parts[2]} ${dObj.toLocaleDateString('en-US', { month: 'short' })} ${parts[0]}`;
+                }
+
+                // Get names of present students
+                const presentNames = academyAttendance
+                    .filter(a => a.date === d && a.status === 'Present')
+                    .map(a => {
+                        const st = academyStudents.find(s => s.id === a.studentId);
+                        return st ? st.name : null;
+                    })
+                    .filter(Boolean);
+
+                let studentsChipsHtml = '';
+                if (presentNames.length > 0) {
+                    studentsChipsHtml = `
+                        <div class="att-students-chips">
+                            <span style="font-size: 0.75rem; color: var(--text-muted); align-self: center; margin-right: 4px;">Present:</span>
+                            ${presentNames.map(name => `<span class="att-student-chip"><i class="fa-solid fa-user-check"></i> ${name}</span>`).join('')}
+                        </div>
+                    `;
+                }
+
+                rowsHtml += `
+                    <div class="att-date-row">
+                        <div style="width: 100%;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                                <div class="att-date-left">
+                                    <div class="att-date-badge-cal">
+                                        <i class="fa-regular fa-calendar"></i> ${parts[2]}
+                                    </div>
+                                    <div>
+                                        <div class="att-date-title">${dayDisplay}, ${dateDisplay}</div>
+                                        <div class="att-date-sub">${count} of ${totalStudents} students attended (${pct}%)</div>
+                                    </div>
+                                </div>
+                                <div class="att-date-right">
+                                    <span class="att-count-pill">
+                                        <i class="fa-solid fa-users"></i> ${count} Present
+                                    </span>
+                                </div>
+                            </div>
+                            ${studentsChipsHtml}
+                        </div>
+                    </div>
+                `;
+            });
+
+            breakdownEl.innerHTML = `
+                <div class="dashboard-att-breakdown-title">
+                    <span><i class="fa-solid fa-list-check" style="color: #f87171; margin-right: 6px;"></i> Date-Wise Session Breakdown (${attDates.length} session${attDates.length > 1 ? 's' : ''})</span>
+                    <span style="font-size: 0.8rem; color: var(--text-muted);">Total Present: ${monthPresentCount}</span>
+                </div>
+                <div class="dashboard-att-date-cards">
+                    ${rowsHtml}
+                </div>
+            `;
+        }
+    }
 }
+
+function renderDashboardAgeStudents() {
+    const selectEl = document.getElementById('dashboard-age-select');
+    const listEl = document.getElementById('dashboard-age-students-list');
+    const titleEl = document.getElementById('dashboard-age-list-title');
+    const countEl = document.getElementById('dashboard-age-list-count');
+    if (!listEl) return;
+
+    const selectedCategory = selectEl ? selectEl.value : 'all';
+    
+    let filtered = academyStudents.filter(s => s.role !== 'coach');
+    if (selectedCategory !== 'all') {
+        filtered = filtered.filter(s => getStudentAgeCategoryId(s) === selectedCategory);
+    }
+
+    // Sort by age ascending, then alphabetically by name
+    filtered.sort((a, b) => {
+        const ageA = parseInt(a.age) || 999;
+        const ageB = parseInt(b.age) || 999;
+        if (ageA !== ageB) return ageA - ageB;
+        return (a.name || '').localeCompare(b.name || '');
+    });
+
+    const activeBracket = DASHBOARD_AGE_BRACKETS.find(b => b.id === selectedCategory);
+    let categoryLabel = 'All Ages';
+    if (selectedCategory === 'unknown') {
+        categoryLabel = 'Unknown Age';
+    } else if (activeBracket) {
+        categoryLabel = activeBracket.label;
+    }
+
+    if (titleEl) {
+        titleEl.innerHTML = `<i class="fa-solid fa-users-viewfinder" style="color: #38bdf8;"></i> Students in <strong>${categoryLabel}</strong>`;
+    }
+    if (countEl) {
+        countEl.innerText = `${filtered.length} Student${filtered.length === 1 ? '' : 's'}`;
+    }
+
+    if (filtered.length === 0) {
+        listEl.innerHTML = `
+            <div style="text-align: center; color: var(--text-muted); padding: 22px 0; font-size: 0.9rem;">
+                <i class="fa-solid fa-user-slash" style="font-size: 1.4rem; display: block; margin-bottom: 6px; opacity: 0.5;"></i>
+                No students found in ${categoryLabel} category.
+            </div>
+        `;
+        return;
+    }
+
+    listEl.innerHTML = filtered.map(student => {
+        const initial = student.name ? student.name.trim().charAt(0).toUpperCase() : 'S';
+        const avatarStyle = student.pic 
+            ? `background-image: url('${student.pic}');` 
+            : `background: linear-gradient(135deg, #1e3a8a, #2563eb);`;
+        const nameColor = (student.gender === 'Female') ? '#ec4899' : '#ffffff';
+        const ageText = student.age && student.age !== '-' ? `${student.age} Yrs` : 'Age: -';
+
+        return `
+            <div class="age-student-row" onclick="openAcademyStudentDetails('${student.id}')" title="Click to view details for ${escapeHtml(student.name)}">
+                <div style="display: flex; align-items: center; gap: 10px; min-width: 0;">
+                    <div class="age-student-avatar" style="${avatarStyle}">
+                        ${student.pic ? '' : initial}
+                    </div>
+                    <div style="min-width: 0;">
+                        <div class="age-student-name" style="color: ${nameColor};">
+                            ${escapeHtml(student.name)}
+                        </div>
+                        <div class="age-student-sub">
+                            <span>ID: ${student.id || '-'}</span>
+                            ${student.contact ? ` • <span>${student.contact}</span>` : ''}
+                        </div>
+                    </div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span class="age-student-badge">${ageText}</span>
+                    <i class="fa-solid fa-chevron-right" style="color: var(--text-muted); font-size: 0.75rem;"></i>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+
+
