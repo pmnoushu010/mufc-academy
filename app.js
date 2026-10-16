@@ -1819,10 +1819,10 @@ async function updateAcademyStudent() {
 
 async function deleteAcademyStudent() {
     if (!currentAcademyStudentId) return;
-    const student = academyStudents.find(s => s.id === currentAcademyStudentId);
+    const student = academyStudents.find(s => String(s.id) === String(currentAcademyStudentId));
     if (!student) return;
 
-    if (currentUser.type !== 'super') {
+    if (currentUser && currentUser.type !== 'super') {
         if (confirm(`You do not have permission to delete this student directly. Do you want to request deletion approval from the Super Admin?`)) {
             student.pendingDeletion = true;
             student.pendingDeletionBy = currentUser.username || currentUser.id;
@@ -1834,12 +1834,47 @@ async function deleteAcademyStudent() {
         return;
     }
 
-    if (confirm(`Are you sure you want to delete ${student.name}? This cannot be undone.`)) {
-        academyStudents = academyStudents.filter(s => s.id !== currentAcademyStudentId);
-        saveData();
+    if (!confirm(`Are you sure you want to PERMANENTLY delete "${student.name}" (ID: ${student.id}) from the database? This cannot be undone.`)) {
+        return;
+    }
+
+    const studentIdToDelete = String(student.id);
+
+    try {
+        const response = await fetch('/api/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'DELETE_ACADEMY_STUDENT',
+                payload: { id: studentIdToDelete }
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`Server returned status ${response.status}`);
+        }
+
+        const resData = await response.json();
+        if (resData && resData.success === false) {
+            throw new Error(resData.error || "Server failed to delete student");
+        }
+
+        // Successfully deleted from database, now update in-memory arrays
+        academyStudents = academyStudents.filter(s => String(s.id) !== studentIdToDelete);
+        if (typeof academyAttendance !== 'undefined' && Array.isArray(academyAttendance)) {
+            academyAttendance = academyAttendance.filter(a => String(a.studentId) !== studentIdToDelete);
+        }
+        if (typeof academyPayments !== 'undefined' && Array.isArray(academyPayments)) {
+            academyPayments = academyPayments.filter(p => String(p.studentId) !== studentIdToDelete);
+        }
+
         closeModal();
         renderAcademyStudents();
-        renderAcademyReports();
+        if (typeof renderAcademyReports === 'function') renderAcademyReports();
+        alert(`Student "${student.name}" has been permanently deleted from the database.`);
+    } catch (err) {
+        console.error("Failed to delete student from database:", err);
+        alert(`Error deleting student from database: ${err.message}. Please try again.`);
     }
 }
 function openAttendanceHistoryModal() {
@@ -2048,6 +2083,40 @@ function formatPaymentDate(dateStr) {
         }
     }
     return dateStr;
+}
+
+function isMobileOrTabletDevice() {
+    const ua = navigator.userAgent || '';
+    
+    // Check iOS devices: iPhone, iPod, iPad
+    if (/iPad|iPhone|iPod/i.test(ua)) return true;
+    
+    // Check iPad on iPadOS 13+ (Safari on iPad reports platform as MacIntel, but has multi-touch points)
+    if (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) return true;
+    
+    // Check Android tablets and phones
+    if (/Android/i.test(ua)) return true;
+    
+    // Check other mobile/tablet user agents
+    if (/webOS|BlackBerry|IEMobile|Opera Mini|Mobile|Tablet/i.test(ua)) return true;
+    
+    // Check touch devices with tablet or mobile screen width (covers tablets requesting desktop mode)
+    if (('ontouchstart' in window || navigator.maxTouchPoints > 0) && (window.innerWidth <= 1024 || (window.screen && window.screen.width <= 1024))) {
+        return true;
+    }
+    
+    return false;
+}
+
+function getWhatsAppUrl(phone, encodedMessage) {
+    const cleanPhone = (phone || '').replace(/\D/g, '');
+    if (isMobileOrTabletDevice()) {
+        // Deep link scheme directly invokes the installed WhatsApp app on mobile and tablet
+        return `whatsapp://send?phone=${cleanPhone}&text=${encodedMessage}`;
+    } else {
+        // Direct WhatsApp Web for desktop/laptop browsers
+        return `https://web.whatsapp.com/send?phone=${cleanPhone}&text=${encodedMessage}`;
+    }
 }
 
 function markWhatsappSent(studentId, monthStr, btnElement) {
@@ -2267,7 +2336,7 @@ function renderAcademyPayments() {
             
             <!-- Col 6: Action -->
             <div style="text-align: center; display: flex; align-items: center; justify-content: center;">
-                ${student.whatsapp ? `<a href="https://web.whatsapp.com/send?phone=${student.whatsapp.replace(/\D/g, '')}&text=${encodedMessage}" target="_blank" onclick="markWhatsappSent('${student.id}', '${monthStr}', this)" class="btn-primary" title="${isWaSent ? 'WhatsApp message already sent. Click to open again.' : 'Send WhatsApp Message'}" style="display: inline-flex; align-items: center; justify-content: center; width: 110px; ${isWaSent ? 'background: #eab308; border-color: #ca8a04; color: #0f172a;' : 'background: #25D366; border-color: #25D366; color: white;'} text-decoration: none; padding: 9px 12px; border-radius: 10px; font-size: 0.92rem; font-weight: 600; gap: 6px; transition: 0.2s;"><i class="fa-brands fa-whatsapp" style="font-size: 1.1rem; ${isWaSent ? 'color: #0f172a;' : ''}"></i> ${isWaSent ? 'Sent' : 'Message'}</a>` : ''}
+                ${student.whatsapp ? `<a href="${getWhatsAppUrl(student.whatsapp, encodedMessage)}" ${isMobileOrTabletDevice() ? '' : 'target="_blank"'} onclick="markWhatsappSent('${student.id}', '${monthStr}', this)" class="btn-primary" title="${isWaSent ? 'WhatsApp message already sent. Click to open again.' : 'Send WhatsApp Message'}" style="display: inline-flex; align-items: center; justify-content: center; width: 110px; ${isWaSent ? 'background: #eab308; border-color: #ca8a04; color: #0f172a;' : 'background: #25D366; border-color: #25D366; color: white;'} text-decoration: none; padding: 9px 12px; border-radius: 10px; font-size: 0.92rem; font-weight: 600; gap: 6px; transition: 0.2s;"><i class="fa-brands fa-whatsapp" style="font-size: 1.1rem; ${isWaSent ? 'color: #0f172a;' : ''}"></i> ${isWaSent ? 'Sent' : 'Message'}</a>` : ''}
             </div>
         `;
         list.appendChild(div);
@@ -2660,8 +2729,10 @@ function viewStudentReportHistory(studentId) {
         const phone = student.whatsapp.replace(/\D/g, '');
         const encodedText = encodeURIComponent(whatsappText.trim());
         const waLink = document.createElement('a');
-        waLink.href = `https://wa.me/${phone}?text=${encodedText}`;
-        waLink.target = '_blank';
+        waLink.href = getWhatsAppUrl(phone, encodedText);
+        if (!isMobileOrTabletDevice()) {
+            waLink.target = '_blank';
+        }
         waLink.className = 'btn-primary';
         waLink.style.cssText = 'display: inline-flex; align-items: center; background: #25D366; border-color: #25D366; color: white; text-decoration: none; padding: 8px 15px; border-radius: 8px; font-size: 0.85rem; font-weight: bold; gap: 6px; transition: 0.2s;';
         waLink.innerHTML = '<i class="fa-brands fa-whatsapp" style="font-size: 1.1rem;"></i> Share via WhatsApp';
