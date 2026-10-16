@@ -2086,25 +2086,21 @@ function formatPaymentDate(dateStr) {
 }
 
 function isMobileOrTabletDevice() {
-    const ua = navigator.userAgent || '';
+    // 1. Any device that supports touch input is a phone or tablet!
+    if ('ontouchstart' in window) return true;
+    if (navigator.maxTouchPoints && navigator.maxTouchPoints > 0) return true;
+    if (navigator.msMaxTouchPoints && navigator.msMaxTouchPoints > 0) return true;
+
+    // 2. Mobile or tablet user agents (iPhone, iPad, Android, etc.)
+    const ua = (navigator.userAgent || navigator.vendor || window.opera || '').toLowerCase();
+    if (/android|iphone|ipad|ipod|blackberry|iemobile|opera mini|mobile|tablet|silk|kindle/i.test(ua)) return true;
     
-    // Check iOS devices: iPhone, iPod, iPad
-    if (/iPad|iPhone|iPod/i.test(ua)) return true;
-    
-    // Check iPad on iPadOS 13+ (Safari on iPad reports platform as MacIntel, but has multi-touch points)
+    // 3. iPadOS 13+ (Safari reports as MacIntel, but has multi-touch points)
     if (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) return true;
-    
-    // Check Android tablets and phones
-    if (/Android/i.test(ua)) return true;
-    
-    // Check other mobile/tablet user agents
-    if (/webOS|BlackBerry|IEMobile|Opera Mini|Mobile|Tablet/i.test(ua)) return true;
-    
-    // Check touch devices with tablet or mobile screen width (covers tablets requesting desktop mode)
-    if (('ontouchstart' in window || navigator.maxTouchPoints > 0) && (window.innerWidth <= 1024 || (window.screen && window.screen.width <= 1024))) {
-        return true;
-    }
-    
+
+    // 4. Viewport size indicating mobile/tablet
+    if (window.innerWidth <= 1024) return true;
+
     return false;
 }
 
@@ -2116,6 +2112,25 @@ function getWhatsAppUrl(phone, encodedMessage) {
     } else {
         // Direct WhatsApp Web for desktop/laptop browsers
         return `https://web.whatsapp.com/send?phone=${cleanPhone}&text=${encodedMessage}`;
+    }
+}
+
+function openWhatsAppMessage(event, studentId, monthStr, phone, encodedMessage, btnElement) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    markWhatsappSent(studentId, monthStr, btnElement);
+
+    const cleanPhone = (phone || '').replace(/\D/g, '');
+    const isMobile = isMobileOrTabletDevice();
+
+    if (isMobile) {
+        // Direct deep link: opens installed WhatsApp app on phone/tablet
+        window.location.href = `whatsapp://send?phone=${cleanPhone}&text=${encodedMessage}`;
+    } else {
+        // Desktop PC (mouse only): opens WhatsApp Web in new tab
+        window.open(`https://web.whatsapp.com/send?phone=${cleanPhone}&text=${encodedMessage}`, '_blank');
     }
 }
 
@@ -2336,7 +2351,7 @@ function renderAcademyPayments() {
             
             <!-- Col 6: Action -->
             <div style="text-align: center; display: flex; align-items: center; justify-content: center;">
-                ${student.whatsapp ? `<a href="${getWhatsAppUrl(student.whatsapp, encodedMessage)}" ${isMobileOrTabletDevice() ? '' : 'target="_blank"'} onclick="markWhatsappSent('${student.id}', '${monthStr}', this)" class="btn-primary" title="${isWaSent ? 'WhatsApp message already sent. Click to open again.' : 'Send WhatsApp Message'}" style="display: inline-flex; align-items: center; justify-content: center; width: 110px; ${isWaSent ? 'background: #eab308; border-color: #ca8a04; color: #0f172a;' : 'background: #25D366; border-color: #25D366; color: white;'} text-decoration: none; padding: 9px 12px; border-radius: 10px; font-size: 0.92rem; font-weight: 600; gap: 6px; transition: 0.2s;"><i class="fa-brands fa-whatsapp" style="font-size: 1.1rem; ${isWaSent ? 'color: #0f172a;' : ''}"></i> ${isWaSent ? 'Sent' : 'Message'}</a>` : ''}
+                ${student.whatsapp ? `<a href="${getWhatsAppUrl(student.whatsapp, encodedMessage)}" ${isMobileOrTabletDevice() ? '' : 'target="_blank"'} onclick="openWhatsAppMessage(event, '${student.id}', '${monthStr}', '${student.whatsapp.replace(/\D/g, '')}', '${encodedMessage}', this)" class="btn-primary" title="${isWaSent ? 'WhatsApp message already sent. Click to open again.' : 'Send WhatsApp Message'}" style="display: inline-flex; align-items: center; justify-content: center; width: 110px; ${isWaSent ? 'background: #eab308; border-color: #ca8a04; color: #0f172a;' : 'background: #25D366; border-color: #25D366; color: white;'} text-decoration: none; padding: 9px 12px; border-radius: 10px; font-size: 0.92rem; font-weight: 600; gap: 6px; transition: 0.2s;"><i class="fa-brands fa-whatsapp" style="font-size: 1.1rem; ${isWaSent ? 'color: #0f172a;' : ''}"></i> ${isWaSent ? 'Sent' : 'Message'}</a>` : ''}
             </div>
         `;
         list.appendChild(div);
