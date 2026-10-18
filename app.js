@@ -15,6 +15,7 @@ let academyPayments = [];
 let coaches = [];
 let academyAccounts = [];
 let academyAdmins = [];
+let coachSalaries = [];
 
 async function initData() {
     try {
@@ -56,6 +57,7 @@ async function initData() {
             academyPayments = data.academyPayments || [];
             coaches = data.coaches || [];
             academyAccounts = data.academyAccounts || [];
+            coachSalaries = data.coachSalaries || [];
             
             academyAdmins = data.academyAdmins && data.academyAdmins.length ? data.academyAdmins : [
                 { username: 'pmnoushu010', password: 'Shanumon@12345$$', type: 'super' },
@@ -111,7 +113,7 @@ initData();
 function saveData() {
     const dataToSave = {
         players, pendingUsers, messages, matches, practiceSession, 
-        attendance, academyStudents, academyAttendance, academyPayments, coaches, academyAccounts, academyAdmins
+        attendance, academyStudents, academyAttendance, academyPayments, coaches, academyAccounts, academyAdmins, coachSalaries
     };
     fetch('/api/data', {
         method: 'POST',
@@ -144,6 +146,7 @@ setInterval(async () => {
             if(data.coaches) coaches = data.coaches;
             if(data.academyAccounts) academyAccounts = data.academyAccounts;
             if(data.academyAdmins) academyAdmins = data.academyAdmins;
+            if(data.coachSalaries) coachSalaries = data.coachSalaries;
 
             sanitizeAcademyData(false);
 
@@ -166,6 +169,7 @@ setInterval(async () => {
                     else if(viewId === 'academy-admin') renderAcademyStudents();
                     else if(viewId === 'academy-attendance') renderAcademyAttendance();
                     else if(viewId === 'academy-coach-attendance') renderAcademyCoachAttendance();
+                    else if(viewId === 'academy-coach-salaries') renderAcademyCoachSalaries();
                     else if(viewId === 'academy-payments') renderAcademyPayments();
                     else if(viewId === 'academy-reports') renderAcademyReports();
                     else if(viewId === 'academy-accounts') renderAcademyAccounts();
@@ -415,7 +419,7 @@ function performLogin(role, user) {
                 item.style.display = (user && (user.type === 'main' || user.type === 'super')) ? 'flex' : 'none';
             } else if (onclick.includes('academy-approvals')) {
                 item.style.display = (user && user.type === 'super') ? 'flex' : 'none';
-            } else if (onclick.includes('academy-accounts')) {
+            } else if (onclick.includes('academy-accounts') || onclick.includes('academy-coach-salaries')) {
                 item.style.display = (user && (user.type === 'main' || user.type === 'super')) ? 'flex' : 'none';
             } else {
                 item.style.display = 'flex';
@@ -502,6 +506,8 @@ function switchView(viewId, event) {
         renderAcademyAttendance();
     } else if(viewId === 'academy-coach-attendance') {
         renderAcademyCoachAttendance();
+    } else if(viewId === 'academy-coach-salaries') {
+        renderAcademyCoachSalaries();
     } else if(viewId === 'academy-payments') {
         renderAcademyPayments();
     } else if(viewId === 'academy-reports') {
@@ -1952,6 +1958,7 @@ function getAllCoaches() {
                     whatsapp: s.whatsapp || '',
                     remarks: s.remarks || '',
                     pic: s.pic || null,
+                    salary: parseFloat(s.salary || s.monthlySalary || 0) || 0,
                     source: 'academy'
                 });
             }
@@ -1971,6 +1978,7 @@ function getAllCoaches() {
                     whatsapp: c.whatsapp || '',
                     remarks: c.remarks || '',
                     pic: c.pic || null,
+                    salary: parseFloat(c.salary || c.monthlySalary || 0) || 0,
                     source: 'online'
                 });
             } else if (key) {
@@ -1978,6 +1986,7 @@ function getAllCoaches() {
                 if (existing) {
                     if (!existing.pic && c.pic) existing.pic = c.pic;
                     if (!existing.whatsapp && c.whatsapp) existing.whatsapp = c.whatsapp;
+                    if (!existing.salary && (c.salary || c.monthlySalary)) existing.salary = parseFloat(c.salary || c.monthlySalary || 0) || 0;
                 }
             }
         }
@@ -2203,8 +2212,30 @@ function markAcademyCoachAttendance(coachId, dateStr, status) {
     } else {
         academyAttendance.push({ date: dateStr, studentId: coachIdStr, status: status, role: 'coach' });
     }
+    
+    // Auto-update accounts entry if coach salary was already recorded for this month
+    const monthStr = dateStr.substring(0, 7);
+    const expectedAccId = `acc_csal_${coachIdStr}_${monthStr}`;
+    const accEntry = (academyAccounts || []).find(a => a.id === expectedAccId);
+    if (accEntry) {
+        const coachObj = getAllCoaches().find(c => String(c.id) === coachIdStr);
+        if (coachObj) {
+            const calc = calculateCoachSalaryDetails(coachObj, monthStr);
+            accEntry.amount = calc.netSalary;
+            accEntry.description = `Coach Salary: ${coachObj.name} (${monthStr}) [${calc.presentCount}/${calc.totalWorkingDays} days, ${calc.leaveDays} leave]`;
+        }
+    }
+
     saveData();
     renderAcademyCoachAttendance();
+    const salView = document.getElementById('view-academy-coach-salaries');
+    if (salView && salView.classList.contains('active')) {
+        renderAcademyCoachSalaries();
+    }
+    const accView = document.getElementById('view-academy-accounts');
+    if (accView && accView.classList.contains('active')) {
+        renderAcademyAccounts();
+    }
 }
 
 function updateAcademyCoachRemark(coachId, value) {
@@ -2319,6 +2350,618 @@ function renderAcademyCoachAttendance() {
         `;
         list.appendChild(div);
     });
+}
+
+// ================= COACH MONTHLY SALARY & EXPENSE LOGIC =================
+
+function getWorkingDaysForMonth(monthStr) {
+    if (!monthStr) {
+        const today = new Date();
+        monthStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+    }
+    const parts = monthStr.split('-');
+    const year = parseInt(parts[0]);
+    const month = parseInt(parts[1]) - 1; // 0-indexed in JS
+    
+    const workingDays = [];
+    const date = new Date(year, month, 1);
+    
+    while (date.getMonth() === month) {
+        const dayOfWeek = date.getDay(); // 0: Sun, 5: Fri, 6: Sat
+        if (dayOfWeek === 5 || dayOfWeek === 6) {
+            const y = date.getFullYear();
+            const m = String(date.getMonth() + 1).padStart(2, '0');
+            const d = String(date.getDate()).padStart(2, '0');
+            workingDays.push({
+                dateStr: `${y}-${m}-${d}`,
+                dayName: dayOfWeek === 5 ? 'Friday' : 'Saturday',
+                dayNum: date.getDate()
+            });
+        }
+        date.setDate(date.getDate() + 1);
+    }
+    return workingDays;
+}
+
+function calculateCoachSalaryDetails(coach, monthStr) {
+    const workingDays = getWorkingDaysForMonth(monthStr);
+    const totalWorkingDays = workingDays.length;
+    const coachIdStr = String(coach.id);
+    
+    // Constant monthly base salary for this coach
+    const baseSalary = parseFloat(coach.salary || coach.monthlySalary || 0) || 0;
+    
+    // Confirmed formula: oneday salary = salary (constant) / no. of fridays and saturdays
+    const dailyRate = totalWorkingDays > 0 ? (baseSalary / totalWorkingDays) : 0;
+    
+    // Attendance on working days
+    let presentCount = 0;
+    let absentCount = 0;
+    let unmarkedCount = 0;
+    const workingDaysDetails = [];
+    
+    workingDays.forEach(w => {
+        const record = getAcademyCoachAttendanceForDate(w.dateStr, coachIdStr);
+        let status = 'Unmarked';
+        if (record && record.status === 'Present') {
+            status = 'Present';
+            presentCount++;
+        } else if (record && record.status === 'Absent') {
+            status = 'Absent';
+            absentCount++;
+        } else {
+            unmarkedCount++;
+        }
+        workingDaysDetails.push({
+            date: w.dateStr,
+            dayName: w.dayName,
+            status: status
+        });
+    });
+    
+    // Check if salary record has custom leave adjustment, else use marked absentCount
+    const salaryRecord = (coachSalaries || []).find(cs => String(cs.coachId) === coachIdStr && cs.month === monthStr);
+    const leaveDays = (salaryRecord && typeof salaryRecord.leaveDays === 'number') 
+        ? salaryRecord.leaveDays 
+        : absentCount;
+        
+    const deduction = Math.round((leaveDays * dailyRate) * 100) / 100;
+    const netSalary = Math.max(0, Math.round((baseSalary - deduction) * 100) / 100);
+    
+    // Check if recorded as expense in academyAccounts
+    const expectedAccId = `acc_csal_${coachIdStr}_${monthStr}`;
+    const accountEntry = (academyAccounts || []).find(a => 
+        a.id === expectedAccId || 
+        (a.category === 'Coach Salary' && String(a.coachId) === coachIdStr && a.month === monthStr)
+    );
+    const isPaid = !!accountEntry || (salaryRecord && salaryRecord.status === 'Paid');
+    
+    return {
+        coach,
+        month: monthStr,
+        baseSalary,
+        totalWorkingDays,
+        presentCount,
+        absentCount,
+        unmarkedCount,
+        leaveDays,
+        dailyRate: Math.round(dailyRate * 100) / 100,
+        deduction,
+        netSalary,
+        workingDaysDetails,
+        isPaid,
+        accountEntry
+    };
+}
+
+function renderAcademyCoachSalaries() {
+    const list = document.getElementById('academy-coach-salaries-list');
+    if (!list) return;
+    
+    let monthInput = document.getElementById('academy-salary-month');
+    let monthStr = monthInput ? monthInput.value : '';
+    if (!monthStr) {
+        const today = new Date();
+        const y = today.getFullYear();
+        const m = String(today.getMonth() + 1).padStart(2, '0');
+        monthStr = `${y}-${m}`;
+        if (monthInput) monthInput.value = monthStr;
+    }
+    
+    const workingDays = getWorkingDaysForMonth(monthStr);
+    const totalWorkingDays = workingDays.length;
+    const fridayCount = workingDays.filter(w => w.dayName === 'Friday').length;
+    const saturdayCount = workingDays.filter(w => w.dayName === 'Saturday').length;
+    
+    const countBadge = document.getElementById('policy-month-days-count');
+    if (countBadge) {
+        countBadge.innerText = `${totalWorkingDays} days (${fridayCount} Fri, ${saturdayCount} Sat)`;
+    }
+    
+    const allCoaches = getAllCoaches();
+    
+    if (allCoaches.length === 0) {
+        list.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 30px;">No registered coaches found.</p>';
+        const baseEl = document.getElementById('stat-salary-total-base');
+        if (baseEl) baseEl.innerText = '0 SAR';
+        const workEl = document.getElementById('stat-salary-working-days');
+        if (workEl) workEl.innerText = `${totalWorkingDays} Days`;
+        const dedEl = document.getElementById('stat-salary-total-deductions');
+        if (dedEl) dedEl.innerText = '0 SAR';
+        const netEl = document.getElementById('stat-salary-net-payable');
+        if (netEl) netEl.innerText = '0 SAR';
+        return;
+    }
+    
+    // Calculate stats for all coaches
+    let totalBase = 0;
+    let totalDeductions = 0;
+    let totalNetPayable = 0;
+    let totalLeaves = 0;
+    
+    const coachCalculations = allCoaches.map(coach => {
+        const calc = calculateCoachSalaryDetails(coach, monthStr);
+        totalBase += calc.baseSalary;
+        totalDeductions += calc.deduction;
+        totalNetPayable += calc.netSalary;
+        totalLeaves += calc.leaveDays;
+        return calc;
+    });
+    
+    const baseEl = document.getElementById('stat-salary-total-base');
+    if (baseEl) baseEl.innerText = `${Math.round(totalBase)} SAR`;
+    
+    const workEl = document.getElementById('stat-salary-working-days');
+    if (workEl) workEl.innerText = `${totalWorkingDays} Days`;
+    const breakEl = document.getElementById('stat-salary-working-breakdown');
+    if (breakEl) breakEl.innerText = `${fridayCount} Fri, ${saturdayCount} Sat in ${monthStr}`;
+    
+    const dedEl = document.getElementById('stat-salary-total-deductions');
+    if (dedEl) dedEl.innerText = `${Math.round(totalDeductions)} SAR`;
+    const leavesEl = document.getElementById('stat-salary-total-leaves-count');
+    if (leavesEl) leavesEl.innerText = `Total Deductions (${totalLeaves} coach leaves)`;
+    
+    const netEl = document.getElementById('stat-salary-net-payable');
+    if (netEl) netEl.innerText = `${Math.round(totalNetPayable)} SAR`;
+    
+    // Filtering and Search
+    const searchInput = document.getElementById('academy-salary-search');
+    const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
+    const statusFilter = document.getElementById('academy-salary-status-filter') ? document.getElementById('academy-salary-status-filter').value : 'all';
+    
+    const filtered = coachCalculations.filter(item => {
+        const nameMatch = item.coach.name && item.coach.name.toLowerCase().includes(query);
+        const mobileMatch = item.coach.mobile && item.coach.mobile.includes(query);
+        const matchesQuery = !query || nameMatch || mobileMatch;
+        
+        let matchesStatus = true;
+        if (statusFilter === 'paid') matchesStatus = item.isPaid;
+        else if (statusFilter === 'unpaid') matchesStatus = !item.isPaid;
+        
+        return matchesQuery && matchesStatus;
+    });
+    
+    list.innerHTML = '';
+    
+    if (filtered.length === 0) {
+        list.innerHTML = `<p style="color: var(--text-muted); text-align: center; padding: 30px;">No coaches match your search criteria.</p>`;
+        return;
+    }
+    
+    filtered.forEach(calc => {
+        const coach = calc.coach;
+        const initial = coach.name ? coach.name.trim().charAt(0).toUpperCase() : 'C';
+        const avatarStyle = coach.pic 
+            ? `background-image: url('${coach.pic}'); background-size: cover; background-position: center;` 
+            : `background: linear-gradient(135deg, #1e3a8a, #2563eb);`;
+            
+        const card = document.createElement('div');
+        card.className = 'player-card';
+        card.style.display = 'flex';
+        card.style.alignItems = 'center';
+        card.style.justifyContent = 'space-between';
+        card.style.padding = '18px 24px';
+        card.style.gap = '20px';
+        card.style.flexWrap = 'wrap';
+        card.style.border = calc.isPaid ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid #374151';
+        card.style.background = calc.isPaid ? 'rgba(16, 185, 129, 0.04)' : 'rgba(15, 23, 42, 0.8)';
+        
+        card.innerHTML = `
+            <!-- Left: Coach Profile -->
+            <div style="display: flex; align-items: center; gap: 16px; min-width: 250px;">
+                <div class="profile-pic" style="min-width: 52px; height: 52px; border-radius: 50%; ${avatarStyle}">
+                    ${coach.pic ? '' : initial}
+                </div>
+                <div>
+                    <h3 style="font-size: 1.25rem; font-weight: 600; color: #fff; margin: 0; display: flex; align-items: center; gap: 8px;">
+                        ${escapeHtml(coach.name)}
+                        <span style="font-size: 0.75rem; background: rgba(59,130,246,0.2); color: #38bdf8; padding: 2px 8px; border-radius: 6px;">Coach</span>
+                        ${calc.isPaid ? '<i class="fa-solid fa-circle-check" style="color: #10b981; font-size: 0.95rem;" title="Salary reflected in Accounts"></i>' : ''}
+                    </h3>
+                    <p style="font-size: 0.9rem; color: var(--text-muted); margin-top: 4px;">
+                        Mobile: <strong style="color: #f1f5f9;">${escapeHtml(coach.mobile || coach.id)}</strong>
+                        ${coach.whatsapp ? ` | WA: <strong style="color: #22c55e;">${escapeHtml(coach.whatsapp)}</strong>` : ''}
+                    </p>
+                </div>
+            </div>
+            
+            <!-- Middle 1: Base Monthly Salary Input -->
+            <div style="display: flex; flex-direction: column; gap: 5px; min-width: 140px;">
+                <label style="font-size: 0.78rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Monthly Salary</label>
+                <div style="display: flex; align-items: center; gap: 6px;">
+                    <input type="number" min="0" step="50" value="${calc.baseSalary || ''}" placeholder="0" 
+                        class="form-input" 
+                        style="width: 110px; padding: 8px 12px; font-weight: 700; text-align: center; border-radius: 8px; background: rgba(15,23,42,0.9); color: #38bdf8; font-size: 1.05rem; border: 1px solid #374151;" 
+                        onchange="updateCoachBaseSalary('${escapeHtml(coach.id)}', this.value)"
+                        title="Enter constant monthly salary">
+                    <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600;">SAR</span>
+                </div>
+            </div>
+            
+            <!-- Middle 2: Attendance on Working Days & Leave Adjustment -->
+            <div style="display: flex; flex-direction: column; gap: 5px; min-width: 210px;">
+                <label style="font-size: 0.78rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">
+                    Working Days (${calc.totalWorkingDays} Fri/Sat)
+                </label>
+                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                    <span style="font-size: 0.85rem; background: rgba(16, 185, 129, 0.15); color: #10b981; padding: 4px 8px; border-radius: 6px; font-weight: 600;" title="Present working days">
+                        <i class="fa-solid fa-check"></i> ${calc.presentCount} Pres
+                    </span>
+                    <span style="font-size: 0.85rem; background: rgba(239, 68, 68, 0.15); color: #ef4444; padding: 4px 8px; border-radius: 6px; font-weight: 600;" title="Absent working days (Leaves)">
+                        <i class="fa-solid fa-xmark"></i> ${calc.leaveDays} Leaves
+                    </span>
+                    <button class="btn-secondary" style="padding: 4px 9px; font-size: 0.8rem; border-radius: 6px; gap: 5px;" onclick="openCoachAttendanceModal('${escapeHtml(coach.id)}', '${monthStr}')" title="View & mark working day dates">
+                        <i class="fa-solid fa-calendar-days"></i> Dates
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Middle 3: Daily Rate & Deduction Formula Breakdown -->
+            <div style="display: flex; flex-direction: column; gap: 4px; min-width: 170px;">
+                <div style="font-size: 0.82rem; color: var(--text-muted);">
+                    1-Day: <strong style="color: #fff;">${calc.dailyRate} SAR</strong>
+                </div>
+                <div style="font-size: 0.82rem; color: #ef4444;">
+                    Deduction: <strong>-${calc.deduction} SAR</strong>
+                </div>
+                <div style="font-size: 1.15rem; font-weight: 700; color: #10b981; margin-top: 2px;">
+                    Net: ${calc.netSalary} SAR
+                </div>
+            </div>
+            
+            <!-- Right: Status and Action Buttons -->
+            <div style="display: flex; align-items: center; gap: 10px; min-width: 190px; justify-content: flex-end;">
+                ${calc.isPaid ? `
+                    <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 6px;">
+                        <span style="background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16,185,129,0.3); padding: 6px 12px; border-radius: 8px; font-size: 0.85rem; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
+                            <i class="fa-solid fa-circle-check"></i> Reflected in Accounts
+                        </span>
+                        <button class="btn-secondary" style="padding: 5px 10px; font-size: 0.8rem; border-color: #ef4444; color: #ef4444; border-radius: 6px;" onclick="removeCoachSalaryFromAccounts('${escapeHtml(coach.id)}', '${monthStr}')" title="Remove salary expense from Accounts">
+                            <i class="fa-solid fa-rotate-left"></i> Remove Expense
+                        </button>
+                    </div>
+                ` : `
+                    <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 6px;">
+                        <span style="background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245,158,11,0.3); padding: 4px 10px; border-radius: 6px; font-size: 0.82rem; font-weight: 600;">
+                            <i class="fa-solid fa-clock"></i> Pending
+                        </span>
+                        <button class="btn-primary" style="padding: 8px 16px; border-radius: 8px; font-size: 0.88rem; background: #10b981; border-color: #10b981; display: flex; align-items: center; gap: 6px;" onclick="postCoachSalaryToAccounts('${escapeHtml(coach.id)}', '${monthStr}')" ${calc.baseSalary <= 0 ? 'disabled' : ''}>
+                            <i class="fa-solid fa-file-invoice-dollar"></i> Add as Expense
+                        </button>
+                    </div>
+                `}
+            </div>
+        `;
+        list.appendChild(card);
+    });
+}
+
+function updateCoachBaseSalary(coachId, value) {
+    const val = parseFloat(value) || 0;
+    const coachIdStr = String(coachId);
+    
+    (academyStudents || []).forEach(s => {
+        if (s.role === 'coach' && (String(s.id) === coachIdStr || String(s.contact) === coachIdStr || String(s.mobile) === coachIdStr)) {
+            s.salary = val;
+            s.monthlySalary = val;
+        }
+    });
+    
+    (coaches || []).forEach(c => {
+        if (String(c.id) === coachIdStr || String(c.mobile) === coachIdStr) {
+            c.salary = val;
+            c.monthlySalary = val;
+        }
+    });
+    
+    const monthInput = document.getElementById('academy-salary-month');
+    const monthStr = monthInput ? monthInput.value : '';
+    if (monthStr) {
+        let rec = (coachSalaries || []).find(cs => String(cs.coachId) === coachIdStr && cs.month === monthStr);
+        if (rec) rec.baseSalary = val;
+        
+        // If already recorded in academyAccounts, update the amount & description automatically!
+        const expectedAccId = `acc_csal_${coachIdStr}_${monthStr}`;
+        const accEntry = (academyAccounts || []).find(a => a.id === expectedAccId);
+        if (accEntry) {
+            const coachObj = getAllCoaches().find(c => String(c.id) === coachIdStr);
+            if (coachObj) {
+                const calc = calculateCoachSalaryDetails(coachObj, monthStr);
+                accEntry.amount = calc.netSalary;
+                accEntry.description = `Coach Salary: ${coachObj.name} (${monthStr}) [${calc.presentCount}/${calc.totalWorkingDays} days, ${calc.leaveDays} leave]`;
+            }
+        }
+    }
+    
+    saveData();
+    renderAcademyCoachSalaries();
+    if (document.getElementById('view-academy-accounts') && document.getElementById('view-academy-accounts').classList.contains('active')) {
+        renderAcademyAccounts();
+    }
+}
+
+function updateCoachLeaveDays(coachId, monthStr, value) {
+    const val = parseInt(value);
+    if (isNaN(val) || val < 0) return;
+    const coachIdStr = String(coachId);
+    
+    let rec = (coachSalaries || []).find(cs => String(cs.coachId) === coachIdStr && cs.month === monthStr);
+    if (!rec) {
+        rec = { coachId: coachIdStr, month: monthStr };
+        coachSalaries.push(rec);
+    }
+    rec.leaveDays = val;
+    
+    // Auto-sync account entry if recorded
+    const expectedAccId = `acc_csal_${coachIdStr}_${monthStr}`;
+    const accEntry = (academyAccounts || []).find(a => a.id === expectedAccId);
+    if (accEntry) {
+        const coachObj = getAllCoaches().find(c => String(c.id) === coachIdStr);
+        if (coachObj) {
+            const calc = calculateCoachSalaryDetails(coachObj, monthStr);
+            accEntry.amount = calc.netSalary;
+            accEntry.description = `Coach Salary: ${coachObj.name} (${monthStr}) [${calc.presentCount}/${calc.totalWorkingDays} days, ${calc.leaveDays} leave]`;
+        }
+    }
+    
+    saveData();
+    renderAcademyCoachSalaries();
+    if (document.getElementById('view-academy-accounts') && document.getElementById('view-academy-accounts').classList.contains('active')) {
+        renderAcademyAccounts();
+    }
+}
+
+function postCoachSalaryToAccounts(coachId, monthStr) {
+    const allCoaches = getAllCoaches();
+    const coach = allCoaches.find(c => String(c.id) === String(coachId));
+    if (!coach) return alert("Coach not found.");
+    
+    const calc = calculateCoachSalaryDetails(coach, monthStr);
+    if (calc.baseSalary <= 0) {
+        return alert(`Please set a monthly salary for ${coach.name} first.`);
+    }
+    
+    const expectedAccId = `acc_csal_${coach.id}_${monthStr}`;
+    
+    // Remove any previous duplicate entry for this coach and month
+    academyAccounts = (academyAccounts || []).filter(a => 
+        a.id !== expectedAccId && 
+        !(a.category === 'Coach Salary' && String(a.coachId) === String(coach.id) && a.month === monthStr)
+    );
+    
+    const today = new Date().toISOString().split('T')[0];
+    const dateStr = today.startsWith(monthStr) ? today : `${monthStr}-28`;
+    
+    academyAccounts.push({
+        id: expectedAccId,
+        date: dateStr,
+        description: `Coach Salary: ${coach.name} (${monthStr}) [${calc.presentCount}/${calc.totalWorkingDays} days, ${calc.leaveDays} leave]`,
+        amount: calc.netSalary,
+        type: 'expense',
+        category: 'Coach Salary',
+        coachId: String(coach.id),
+        month: monthStr
+    });
+    
+    let rec = (coachSalaries || []).find(cs => String(cs.coachId) === String(coach.id) && cs.month === monthStr);
+    if (!rec) {
+        rec = { coachId: String(coach.id), month: monthStr };
+        coachSalaries.push(rec);
+    }
+    rec.status = 'Paid';
+    rec.netSalary = calc.netSalary;
+    rec.baseSalary = calc.baseSalary;
+    rec.leaveDays = calc.leaveDays;
+    rec.paidDate = dateStr;
+    
+    saveData();
+    renderAcademyCoachSalaries();
+    if (document.getElementById('view-academy-accounts') && document.getElementById('view-academy-accounts').classList.contains('active')) {
+        renderAcademyAccounts();
+    }
+    alert(`Salary for ${coach.name} (${calc.netSalary} SAR) has been recorded in the Accounts tab as an Expense.`);
+}
+
+function removeCoachSalaryFromAccounts(coachId, monthStr) {
+    if (!confirm("Are you sure you want to remove this salary expense from Accounts?")) return;
+    
+    const expectedAccId = `acc_csal_${coachId}_${monthStr}`;
+    academyAccounts = (academyAccounts || []).filter(a => 
+        a.id !== expectedAccId && 
+        !(a.category === 'Coach Salary' && String(a.coachId) === String(coachId) && a.month === monthStr)
+    );
+    
+    const rec = (coachSalaries || []).find(cs => String(cs.coachId) === String(coachId) && cs.month === monthStr);
+    if (rec) {
+        rec.status = 'Pending';
+    }
+    
+    saveData();
+    renderAcademyCoachSalaries();
+    if (document.getElementById('view-academy-accounts') && document.getElementById('view-academy-accounts').classList.contains('active')) {
+        renderAcademyAccounts();
+    }
+}
+
+function syncAllCoachSalariesToAccounts() {
+    const monthInput = document.getElementById('academy-salary-month');
+    const monthStr = monthInput ? monthInput.value : '';
+    if (!monthStr) return alert("Please select a valid month.");
+    
+    const allCoaches = getAllCoaches();
+    let count = 0;
+    
+    allCoaches.forEach(coach => {
+        const calc = calculateCoachSalaryDetails(coach, monthStr);
+        if (calc.baseSalary > 0) {
+            const expectedAccId = `acc_csal_${coach.id}_${monthStr}`;
+            academyAccounts = (academyAccounts || []).filter(a => 
+                a.id !== expectedAccId && 
+                !(a.category === 'Coach Salary' && String(a.coachId) === String(coach.id) && a.month === monthStr)
+            );
+            
+            const today = new Date().toISOString().split('T')[0];
+            const dateStr = today.startsWith(monthStr) ? today : `${monthStr}-28`;
+            
+            academyAccounts.push({
+                id: expectedAccId,
+                date: dateStr,
+                description: `Coach Salary: ${coach.name} (${monthStr}) [${calc.presentCount}/${calc.totalWorkingDays} days, ${calc.leaveDays} leave]`,
+                amount: calc.netSalary,
+                type: 'expense',
+                category: 'Coach Salary',
+                coachId: String(coach.id),
+                month: monthStr
+            });
+            
+            let rec = (coachSalaries || []).find(cs => String(cs.coachId) === String(coach.id) && cs.month === monthStr);
+            if (!rec) {
+                rec = { coachId: String(coach.id), month: monthStr };
+                coachSalaries.push(rec);
+            }
+            rec.status = 'Paid';
+            rec.netSalary = calc.netSalary;
+            rec.baseSalary = calc.baseSalary;
+            rec.leaveDays = calc.leaveDays;
+            rec.paidDate = dateStr;
+            count++;
+        }
+    });
+    
+    saveData();
+    renderAcademyCoachSalaries();
+    if (document.getElementById('view-academy-accounts') && document.getElementById('view-academy-accounts').classList.contains('active')) {
+        renderAcademyAccounts();
+    }
+    alert(`Successfully synced ${count} coach salaries to the Accounts tab as Expenses for ${monthStr}!`);
+}
+
+function openCoachAttendanceModal(coachId, monthStr) {
+    const allCoaches = getAllCoaches();
+    const coach = allCoaches.find(c => String(c.id) === String(coachId));
+    if (!coach) return alert("Coach not found.");
+    
+    const calc = calculateCoachSalaryDetails(coach, monthStr);
+    
+    document.getElementById('cwd-modal-title').innerText = `${coach.name} - Attendance`;
+    document.getElementById('cwd-modal-subtitle').innerText = `Working Days in ${monthStr} (${calc.totalWorkingDays} Fridays & Saturdays)`;
+    
+    const list = document.getElementById('cwd-modal-list');
+    list.innerHTML = '';
+    
+    calc.workingDaysDetails.forEach(w => {
+        const isPresent = w.status === 'Present';
+        const isAbsent = w.status === 'Absent';
+        
+        const row = document.createElement('div');
+        row.style.display = 'flex';
+        row.style.alignItems = 'center';
+        row.style.justifyContent = 'space-between';
+        row.style.padding = '10px 16px';
+        row.style.background = 'rgba(15, 23, 42, 0.7)';
+        row.style.borderRadius = '10px';
+        row.style.border = '1px solid #374151';
+        
+        row.innerHTML = `
+            <div>
+                <strong style="color: #fff; font-size: 0.95rem;">${escapeHtml(w.date)}</strong>
+                <span style="font-size: 0.8rem; color: #38bdf8; margin-left: 8px; background: rgba(56,189,248,0.15); padding: 2px 8px; border-radius: 6px;">${escapeHtml(w.dayName)}</span>
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <button class="btn-primary" style="padding: 6px 12px; font-size: 0.82rem; border-radius: 6px; ${isPresent ? 'background: #10b981; border-color: #10b981;' : 'opacity: 0.5; background: #374151; border-color: #374151;'}" onclick="toggleModalCoachAttendance('${escapeHtml(coach.id)}', '${w.date}', 'Present', '${monthStr}')">
+                    <i class="fa-solid fa-check"></i> Present
+                </button>
+                <button class="btn-secondary" style="padding: 6px 12px; font-size: 0.82rem; border-radius: 6px; ${isAbsent ? 'background: #ef4444; border-color: #ef4444; color: #fff;' : 'opacity: 0.5; background: #374151; border-color: #374151; color: #9ca3af;'}" onclick="toggleModalCoachAttendance('${escapeHtml(coach.id)}', '${w.date}', 'Absent', '${monthStr}')">
+                    <i class="fa-solid fa-xmark"></i> Absent
+                </button>
+            </div>
+        `;
+        list.appendChild(row);
+    });
+    
+    document.getElementById('cwd-modal-summary').innerHTML = `
+        <strong>${calc.presentCount}</strong> Present | <strong style="color: #ef4444;">${calc.leaveDays}</strong> Leaves | Deduction: <strong style="color: #ef4444;">-${calc.deduction} SAR</strong>
+    `;
+    
+    document.getElementById('coach-working-days-modal').classList.add('active');
+}
+
+function toggleModalCoachAttendance(coachId, dateStr, status, monthStr) {
+    markAcademyCoachAttendance(coachId, dateStr, status);
+    openCoachAttendanceModal(coachId, monthStr);
+}
+
+function exportCoachSalariesToExcel() {
+    if (typeof XLSX === 'undefined') {
+        alert("Excel export library is still loading or failed to load.");
+        return;
+    }
+    
+    const monthInput = document.getElementById('academy-salary-month');
+    const monthStr = monthInput ? monthInput.value : '';
+    const workingDays = getWorkingDaysForMonth(monthStr);
+    const allCoaches = getAllCoaches();
+    
+    const data = [
+        [`MUFC Academy - Coach Payroll (${monthStr})`],
+        [`Working Days Policy: Fridays & Saturdays (${workingDays.length} working days)`],
+        [`Daily Rate Formula: Monthly Salary ÷ Working Days (Leaves Deduction = Leaves × Daily Rate)`],
+        [],
+        ["Coach Name", "Mobile", "Base Salary (SAR)", "Working Days", "Present Days", "Leave Days", "1-Day Salary (SAR)", "Deduction (SAR)", "Net Payable (SAR)", "Accounts Status"]
+    ];
+    
+    let totalBase = 0;
+    let totalDeductions = 0;
+    let totalNet = 0;
+    
+    allCoaches.forEach(coach => {
+        const calc = calculateCoachSalaryDetails(coach, monthStr);
+        totalBase += calc.baseSalary;
+        totalDeductions += calc.deduction;
+        totalNet += calc.netSalary;
+        
+        data.push([
+            coach.name,
+            coach.mobile || coach.id,
+            calc.baseSalary,
+            calc.totalWorkingDays,
+            calc.presentCount,
+            calc.leaveDays,
+            calc.dailyRate,
+            calc.deduction,
+            calc.netSalary,
+            calc.isPaid ? "Reflected in Accounts" : "Pending"
+        ]);
+    });
+    
+    data.push([]);
+    data.push(["TOTALS", "", totalBase, "", "", "", "", totalDeductions, totalNet, ""]);
+    
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Coach Salaries");
+    
+    XLSX.writeFile(wb, `MUFC_Coach_Salaries_${monthStr}.xlsx`);
 }
 
 function markAcademyAttendance(studentId, dateStr, status) {
@@ -3103,10 +3746,16 @@ function renderAcademyAccounts() {
         }
 
         const isInc = entry.type === 'income';
+        const isCoachSalary = entry.category === 'Coach Salary' || (entry.description && entry.description.startsWith('Coach Salary'));
+        const coachIcon = isCoachSalary ? '<i class="fa-solid fa-user-tie" style="color: #ef4444; margin-right: 8px;"></i>' : '';
+        
         list.innerHTML += `
-            <div class="player-card" style="display: flex; align-items: center; padding: 15px 22px; border-radius: 12px; margin-bottom: 10px; background: rgba(15, 23, 42, 0.8); border: 1px solid #374151;">
+            <div class="player-card" style="display: flex; align-items: center; padding: 15px 22px; border-radius: 12px; margin-bottom: 10px; background: rgba(15, 23, 42, 0.8); border: 1px solid ${isCoachSalary ? 'rgba(239, 68, 68, 0.35)' : '#374151'};">
                 <div style="width: 140px; color: var(--text-muted); font-size: 0.95rem; font-weight: 500;">${escapeHtml(entry.date)}</div>
-                <div style="flex: 1; min-width: 200px; color: #fff; font-size: 1.02rem;">${escapeHtml(entry.description)}</div>
+                <div style="flex: 1; min-width: 200px; color: #fff; font-size: 1.02rem;">
+                    ${coachIcon}${escapeHtml(entry.description)}
+                    ${isCoachSalary ? '<span style="font-size: 0.75rem; background: rgba(239, 68, 68, 0.15); color: #ef4444; padding: 2px 8px; border-radius: 6px; margin-left: 8px; font-weight: 600;">Coach Salary</span>' : ''}
+                </div>
                 <div style="width: 130px; text-align: right; color: #10b981; font-weight: 700; font-size: 1.05rem;">${isInc ? amount + ' SAR' : '-'}</div>
                 <div style="width: 130px; text-align: right; color: #ef4444; font-weight: 700; font-size: 1.05rem;">${!isInc ? amount + ' SAR' : '-'}</div>
                 <div style="width: 60px; text-align: center;">
@@ -3159,9 +3808,22 @@ function addAccountEntry() {
 
 function deleteAccountEntry(id) {
     if(!confirm("Are you sure you want to delete this transaction?")) return;
+    const deletedEntry = (academyAccounts || []).find(a => a.id === id);
+    if (deletedEntry && (deletedEntry.category === 'Coach Salary' || (deletedEntry.description && deletedEntry.description.startsWith('Coach Salary')))) {
+        const coachIdStr = String(deletedEntry.coachId || '');
+        const monthStr = deletedEntry.month || (deletedEntry.date ? deletedEntry.date.substring(0, 7) : '');
+        if (coachIdStr && monthStr) {
+            let rec = (coachSalaries || []).find(cs => String(cs.coachId) === coachIdStr && cs.month === monthStr);
+            if (rec) rec.status = 'Pending';
+        }
+    }
     academyAccounts = academyAccounts.filter(a => a.id !== id);
     saveData();
     renderAcademyAccounts();
+    const salView = document.getElementById('view-academy-coach-salaries');
+    if (salView && salView.classList.contains('active')) {
+        renderAcademyCoachSalaries();
+    }
 }
 
 function exportAcademyAccountsToExcel() {

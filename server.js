@@ -53,8 +53,9 @@ const AppDataSchema = new mongoose.Schema({
     academyPayments: { type: Array, default: [] },
     coaches: { type: Array, default: [] },
     academyAccounts: { type: Array, default: [] },
-    academyAdmins: { type: Array, default: [] }
-}, { minimize: false });
+    academyAdmins: { type: Array, default: [] },
+    coachSalaries: { type: Array, default: [] }
+}, { minimize: false, strict: false });
 
 const AppData = mongoose.model('AppData', AppDataSchema);
 
@@ -74,6 +75,7 @@ async function getAppData() {
             academyPayments: [],
             coaches: [],
             academyAccounts: [],
+            coachSalaries: [],
             academyAdmins: [
                 { username: 'pmnoushu010', password: 'Aamir@12345$', type: 'super' },
                 { username: 'mufcacademy', password: 'admin@12345', type: 'main' },
