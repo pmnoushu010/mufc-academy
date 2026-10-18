@@ -13,8 +13,20 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
+// Disable aggressive caching for HTML, JS and JSON so mobile browsers always get latest updates
+app.use((req, res, next) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.setHeader('Surrogate-Control', 'no-store');
+    next();
+});
+
 // Serve static files
-app.use(express.static(__dirname));
+app.use(express.static(__dirname, {
+    etag: false,
+    maxAge: 0
+}));
 
 // Explicitly serve index.html for the root route to fix "Not Found" on some cloud environments
 app.get('/', (req, res) => {
@@ -79,6 +91,30 @@ async function getAppData() {
 app.get('/api/data', async (req, res) => {
     try {
         const data = await getAppData();
+        // Server-side safety cleanup: if students were deleted, remove any orphaned attendance or payment records
+        if (data.academyStudents && Array.isArray(data.academyStudents) && data.academyStudents.length > 0) {
+            const validIds = new Set(data.academyStudents.map(s => String(s.id)));
+            let modified = false;
+            if (data.academyAttendance && Array.isArray(data.academyAttendance)) {
+                const cleanAtt = data.academyAttendance.filter(a => a && a.studentId && validIds.has(String(a.studentId)));
+                if (cleanAtt.length !== data.academyAttendance.length) {
+                    data.academyAttendance = cleanAtt;
+                    data.markModified('academyAttendance');
+                    modified = true;
+                }
+            }
+            if (data.academyPayments && Array.isArray(data.academyPayments)) {
+                const cleanPay = data.academyPayments.filter(p => p && p.studentId && validIds.has(String(p.studentId)));
+                if (cleanPay.length !== data.academyPayments.length) {
+                    data.academyPayments = cleanPay;
+                    data.markModified('academyPayments');
+                    modified = true;
+                }
+            }
+            if (modified) {
+                await data.save();
+            }
+        }
         res.json(data);
     } catch (err) {
         console.error(err);
@@ -89,9 +125,7 @@ app.get('/api/data', async (req, res) => {
 // 2. Fallback Save entire state (legacy support for app.js while refactoring)
 app.post('/api/data', async (req, res) => {
     try {
-        let data = await getAppData();
-        Object.assign(data, req.body);
-        await data.save();
+        await AppData.updateOne({}, { $set: req.body });
         res.json({ success: true });
     } catch (err) {
         console.error(err);
@@ -176,9 +210,22 @@ app.post('/api/sync', async (req, res) => {
                 data.markModified('academyStudents');
                 break;
             case 'DELETE_ACADEMY_STUDENT':
-                data.academyStudents = data.academyStudents.filter(s => s.id !== payload.id);
-                data.markModified('academyStudents');
-                break;
+                const targetStudentId = String(payload.id);
+                data.academyStudents = data.academyStudents.filter(s => String(s.id) !== targetStudentId);
+                if (data.academyAttendance) {
+                    data.academyAttendance = data.academyAttendance.filter(a => String(a.studentId) !== targetStudentId);
+                }
+                if (data.academyPayments) {
+                    data.academyPayments = data.academyPayments.filter(p => String(p.studentId) !== targetStudentId);
+                }
+                await AppData.updateOne({}, {
+                    $set: {
+                        academyStudents: data.academyStudents,
+                        academyAttendance: data.academyAttendance,
+                        academyPayments: data.academyPayments
+                    }
+                });
+                return res.json({ success: true, state: data });
             case 'ADD_ACADEMY_PAYMENT':
                 data.academyPayments.push(payload);
                 data.markModified('academyPayments');

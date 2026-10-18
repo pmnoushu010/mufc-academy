@@ -87,6 +87,11 @@ async function initData() {
                 needSave = true;
             }
 
+            // Clean up any orphaned attendance/payment records from deleted students & heal bloated payment history
+            if (sanitizeAcademyData(false)) {
+                needSave = true;
+            }
+
             if (needSave) {
                 saveData();
             }
@@ -139,6 +144,8 @@ setInterval(async () => {
             if(data.coaches) coaches = data.coaches;
             if(data.academyAccounts) academyAccounts = data.academyAccounts;
             if(data.academyAdmins) academyAdmins = data.academyAdmins;
+
+            sanitizeAcademyData(false);
 
             // Re-render current active view to show changes from other users
             const activeView = document.querySelector('.view.active');
@@ -1871,6 +1878,8 @@ async function deleteAcademyStudent() {
         closeModal();
         renderAcademyStudents();
         if (typeof renderAcademyReports === 'function') renderAcademyReports();
+        if (typeof renderAcademyDashboard === 'function') renderAcademyDashboard();
+        if (typeof renderAcademyAttendance === 'function') renderAcademyAttendance();
         alert(`Student "${student.name}" has been permanently deleted from the database.`);
     } catch (err) {
         console.error("Failed to delete student from database:", err);
@@ -1918,8 +1927,98 @@ function openAttendanceHistoryModal() {
 
 // ================= ACADEMY ATTENDANCE LOGIC =================
 
+function sanitizeAcademyData(triggerSave = true) {
+    if (!Array.isArray(academyStudents) || academyStudents.length === 0) return false;
+    const activeStudentIds = new Set(academyStudents.map(s => String(s.id)));
+    let changed = false;
+
+    // 1. Remove orphaned attendance records for students who no longer exist
+    if (Array.isArray(academyAttendance)) {
+        const origAttLen = academyAttendance.length;
+        academyAttendance = academyAttendance.filter(a => a && a.studentId && activeStudentIds.has(String(a.studentId)));
+        if (academyAttendance.length !== origAttLen) {
+            changed = true;
+        }
+    }
+
+    // 2. Remove orphaned payments for students who no longer exist
+    if (Array.isArray(academyPayments)) {
+        const origPayLen = academyPayments.length;
+        academyPayments = academyPayments.filter(p => p && p.studentId && activeStudentIds.has(String(p.studentId)));
+        if (academyPayments.length !== origPayLen) {
+            changed = true;
+        }
+    }
+
+    // 3. Fix bloated payment history / desynchronized payments (e.g. duplicate pushes on edit)
+    if (Array.isArray(academyPayments)) {
+        academyPayments.forEach(p => {
+            if (!p) return;
+            const amt = parseFloat(p.amount) || parseFloat(p.paid) || 0;
+            if (p.status !== 'Paid' && p.status !== 'paid') {
+                if (p.history && p.history.length > 0) {
+                    p.history = [];
+                    changed = true;
+                }
+            } else if (p.history && Array.isArray(p.history) && p.history.length > 0) {
+                const histSum = p.history.reduce((sum, h) => sum + (parseFloat(h.amount) || 0), 0);
+                if (histSum > amt) {
+                    p.history = [{ date: p.date || new Date().toISOString().split('T')[0], amount: amt }];
+                    changed = true;
+                }
+            }
+        });
+    }
+
+    if (changed && triggerSave) {
+        saveData();
+    }
+    return changed;
+}
+
+function calculateCollectedForDate(dateStr) {
+    let todayCollected = 0;
+    const activeStudentIds = new Set((academyStudents || []).map(s => String(s.id)));
+
+    (academyPayments || []).forEach(p => {
+        if (!p) return;
+        if (p.status !== 'Paid' && p.status !== 'paid') return;
+        if (!activeStudentIds.has(String(p.studentId))) return;
+
+        const totalPaid = parseFloat(p.amount) || parseFloat(p.paid) || 0;
+        if (totalPaid <= 0) return;
+
+        if (p.history && Array.isArray(p.history) && p.history.length > 0) {
+            const histSum = p.history.reduce((sum, h) => sum + (parseFloat(h.amount) || 0), 0);
+            if (histSum > totalPaid) {
+                p.history = [{ date: p.date || dateStr, amount: totalPaid }];
+            }
+
+            let dateSum = 0;
+            p.history.forEach(h => {
+                if (h.date === dateStr) {
+                    dateSum += parseFloat(h.amount) || 0;
+                }
+            });
+            todayCollected += Math.min(dateSum, totalPaid);
+        } else if (p.date === dateStr) {
+            todayCollected += totalPaid;
+        }
+    });
+
+    return todayCollected;
+}
+
+function updateTodayCollectedBadge() {
+    const collectedEl = document.getElementById('academy-today-collected');
+    if (!collectedEl) return;
+    const datePicker = document.getElementById('academy-attendance-date');
+    const dateStr = datePicker && datePicker.value ? datePicker.value : new Date().toISOString().split('T')[0];
+    collectedEl.innerText = calculateCollectedForDate(dateStr);
+}
+
 function getAcademyAttendanceForDate(dateStr, studentId) {
-    return academyAttendance.find(a => a.date === dateStr && a.studentId === studentId);
+    return academyAttendance.find(a => a.date === dateStr && String(a.studentId) === String(studentId));
 }
 
 function renderAcademyAttendance() {
@@ -1941,24 +2040,15 @@ function renderAcademyAttendance() {
         return;
     }
     
-    let presentCount = 0;
+    // Accurate total strength for today across all registered students (independent of search query)
+    const totalPresentToday = academyStudents.filter(s => {
+        const r = getAcademyAttendanceForDate(dateStr, s.id);
+        return r && r.status === 'Present';
+    }).length;
+    document.getElementById('academy-total-strength').innerText = `${totalPresentToday} / ${academyStudents.length}`;
     
     // Calculate total collected for this specific date
-    let todayCollected = 0;
-    academyPayments.forEach(p => {
-        if (p.history) {
-            p.history.forEach(h => {
-                if (h.date === dateStr) {
-                    todayCollected += parseFloat(h.amount) || 0;
-                }
-            });
-        } else if (p.status === 'Paid') {
-            // Fallback for older payments if we assume they were paid on the 1st of the month
-            // or just ignore them since we just wiped data anyway.
-        }
-    });
-    const collectedEl = document.getElementById('academy-today-collected');
-    if(collectedEl) collectedEl.innerText = todayCollected;
+    updateTodayCollectedBadge();
     
     const searchInput = document.getElementById('academy-attendance-search');
     const searchQuery = searchInput ? searchInput.value.toLowerCase() : '';
@@ -2035,8 +2125,6 @@ function renderAcademyAttendance() {
         `;
         list.appendChild(div);
     });
-    
-    document.getElementById('academy-total-strength').innerText = `${presentCount} / ${academyStudents.length}`;
 }
 
 function markAcademyAttendance(studentId, dateStr, status) {
@@ -2412,18 +2500,26 @@ function handleFeeInput(inputElem, studentId, monthStr) {
     let payment = getAcademyPaymentForMonth(monthStr, studentId);
     let isPaid = payment && payment.status === 'Paid';
     
+    const datePicker = document.getElementById('academy-attendance-date');
+    const exactDate = datePicker && datePicker.value ? datePicker.value : new Date().toISOString().split('T')[0];
+    
     if (isPaid && amount <= 0) {
         payment.status = 'Unpaid';
         payment.amount = 0;
         payment.paid = 0;
+        payment.history = [];
         isPaid = false;
         saveData();
         if(document.getElementById('view-academy-accounts').classList.contains('active')) renderAcademyAccounts();
     } else if (isPaid && amount > 0) {
         payment.amount = amount;
         payment.paid = amount;
+        payment.history = [{ date: payment.date || exactDate, amount: amount }];
         saveData();
+        if(document.getElementById('view-academy-accounts').classList.contains('active')) renderAcademyAccounts();
     }
+    
+    updateTodayCollectedBadge();
     
     const btn = document.getElementById(`pay-btn-${studentId}`);
     if (btn) {
@@ -2475,8 +2571,7 @@ function togglePaymentStatusFromAttendance(studentId, monthStr) {
         payment.amount = amount;
         payment.paid = amount;
         payment.date = exactDate;
-        if (!payment.history) payment.history = [];
-        payment.history.push({ date: exactDate, amount: amount });
+        payment.history = [{ date: exactDate, amount: amount }];
     } else {
         academyPayments.push({
             month: monthStr,
@@ -3229,11 +3324,20 @@ function renderAcademyApprovals() {
 
 function approveDeletion(id) {
     if(!confirm("Are you sure you want to PERMANENTLY delete this student?")) return;
-    academyStudents = academyStudents.filter(s => s.id !== id);
+    const studentIdStr = String(id);
+    academyStudents = academyStudents.filter(s => String(s.id) !== studentIdStr);
+    if (typeof academyAttendance !== 'undefined' && Array.isArray(academyAttendance)) {
+        academyAttendance = academyAttendance.filter(a => String(a.studentId) !== studentIdStr);
+    }
+    if (typeof academyPayments !== 'undefined' && Array.isArray(academyPayments)) {
+        academyPayments = academyPayments.filter(p => String(p.studentId) !== studentIdStr);
+    }
     saveData();
     renderAcademyApprovals();
     renderAcademyStudents();
     renderAcademyReports();
+    if (typeof renderAcademyDashboard === 'function') renderAcademyDashboard();
+    if (typeof renderAcademyAttendance === 'function') renderAcademyAttendance();
     alert("Student deleted successfully.");
 }
 
@@ -3349,10 +3453,13 @@ function renderAcademyDashboard() {
     // 2. Calculate Attendance for Selected Month
     const dateStats = {};
     let monthPresentCount = 0;
+    const activeStudentIds = new Set(academyStudents.map(s => String(s.id)));
     academyAttendance.forEach(a => {
         if(a.status === 'Present' && a.date && a.date.startsWith(monthStr)) {
-            dateStats[a.date] = (dateStats[a.date] || 0) + 1;
-            monthPresentCount++;
+            if (activeStudentIds.has(String(a.studentId))) {
+                dateStats[a.date] = (dateStats[a.date] || 0) + 1;
+                monthPresentCount++;
+            }
         }
     });
     let attDates = Object.keys(dateStats).sort();
@@ -3792,9 +3899,9 @@ function renderAcademyDashboard() {
 
                 // Get names of present students
                 const presentNames = academyAttendance
-                    .filter(a => a.date === d && a.status === 'Present')
+                    .filter(a => a.date === d && a.status === 'Present' && activeStudentIds.has(String(a.studentId)))
                     .map(a => {
-                        const st = academyStudents.find(s => s.id === a.studentId);
+                        const st = academyStudents.find(s => String(s.id) === String(a.studentId));
                         return st ? st.name : null;
                     })
                     .filter(Boolean);
