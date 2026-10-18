@@ -139,6 +139,9 @@
                     <a href="#" class="nav-item" onclick="switchView('academy-attendance', event)">
                         <i class="fa-solid fa-clipboard-check"></i><span>Attendance</span>
                     </a>
+                    <a href="#" class="nav-item" onclick="switchView('academy-coach-attendance', event)">
+                        <i class="fa-solid fa-user-tie"></i><span>Coach Attendance</span>
+                    </a>
                     <a href="#" class="nav-item" onclick="switchView('academy-payments', event)">
                         <i class="fa-solid fa-wallet"></i><span>Payments</span>
                     </a>
@@ -524,6 +527,38 @@
                     </div>
                 </section>
 
+                <!-- Coach Attendance View -->
+                <section id="view-academy-coach-attendance" class="view">
+                    <div class="view-header">
+                        <div>
+                            <h2>Coach Attendance</h2>
+                            <p style="font-size: 0.95rem; color: var(--text-muted); margin-top: 4px;">Mark daily coach attendance & view presence</p>
+                        </div>
+                        <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 8px;">
+                            <input type="date" id="academy-coach-attendance-date" class="form-select" style="padding: 10px 14px; width: 160px; font-size: 0.95rem; background: rgba(15, 23, 42, 0.8);" onclick="this.showPicker()" onchange="renderAcademyCoachAttendance()">
+                        </div>
+                    </div>
+                    
+                    <div class="activity-card" style="margin-bottom: 20px; padding: 18px 24px; display: flex;">
+                        <div class="activity-stat" style="text-align: center; flex: 1; border-right: 1px solid rgba(255,255,255,0.1);">
+                            <h3 class="good-stat" id="academy-coach-total-strength" style="font-size: 1.8rem; font-weight: 700;">0 / 0</h3>
+                            <p style="font-size: 0.95rem; margin-top: 4px;">Total Coaches Present Today</p>
+                        </div>
+                        <div class="activity-stat" style="text-align: center; flex: 1;">
+                            <h3 style="color: #38bdf8; font-size: 1.8rem; font-weight: 700; margin: 0 0 5px 0;" id="academy-coach-total-registered">0 Coaches</h3>
+                            <p style="font-size: 0.95rem; margin-top: 4px;">Total Registered Coaches</p>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-bottom: 20px;">
+                        <input type="text" id="academy-coach-attendance-search" placeholder="Search coach name or mobile..." class="form-input" style="width: 100%; padding: 14px 18px; border-radius: 12px; background: var(--bg-card); color: #fff; border: 1px solid #374151; font-size: 1.05rem;" onkeyup="renderAcademyCoachAttendance()">
+                    </div>
+                    
+                    <div id="academy-coach-attendance-list" class="player-list">
+                        <!-- Populated dynamically -->
+                    </div>
+                </section>
+
                 <section id="view-academy-payments" class="view">
                     <div class="view-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                         <div>
@@ -747,7 +782,7 @@
                     </div>
 
                     <!-- Add User Form -->
-                    <div style="background: var(--bg-card); padding: 15px; border-radius: 12px; border: 1px solid #374151; margin-bottom: 20px;">
+                    <div id="academy-add-user-container" style="background: var(--bg-card); padding: 15px; border-radius: 12px; border: 1px solid #374151; margin-bottom: 20px;">
                         <h3 style="font-size: 0.95rem; margin-bottom: 12px; color: var(--text-muted);">Create New User</h3>
                         <div style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;">
                             <div style="flex: 2; min-width: 200px;">
@@ -780,6 +815,25 @@
                     </div>
                     
                     <div id="academy-users-list" class="player-list">
+                        <!-- Populated dynamically -->
+                    </div>
+
+                    <!-- Registered Coaches Section -->
+                    <div class="view-header" style="margin: 35px 0 15px 0;">
+                        <div>
+                            <h2>Registered Coaches</h2>
+                            <p style="font-size: 0.8rem; color: var(--text-muted);">Coaches registered online and in Academy</p>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; align-items: center; padding: 0 20px 10px 20px; color: var(--text-muted); font-size: 0.95rem; font-weight: bold; border-bottom: 1px solid #374151; margin-bottom: 10px;">
+                        <div style="flex: 2; min-width: 200px;">Coach Name</div>
+                        <div style="flex: 2; min-width: 200px;">Mobile / Login ID</div>
+                        <div style="width: 150px;">Role / Source</div>
+                        <div style="width: 140px; text-align: center;">WhatsApp</div>
+                    </div>
+                    
+                    <div id="academy-coaches-users-list" class="player-list">
                         <!-- Populated dynamically -->
                     </div>
                 </section>
@@ -1194,6 +1248,6 @@
         </div>
 
     </div>
-    <script src="app.js?v=26"></script>
+    <script src="app.js?v=27"></script>
 </body>
 </html>

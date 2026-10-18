@@ -165,6 +165,7 @@ setInterval(async () => {
                     else if(viewId === 'player-messages') renderPlayerChat();
                     else if(viewId === 'academy-admin') renderAcademyStudents();
                     else if(viewId === 'academy-attendance') renderAcademyAttendance();
+                    else if(viewId === 'academy-coach-attendance') renderAcademyCoachAttendance();
                     else if(viewId === 'academy-payments') renderAcademyPayments();
                     else if(viewId === 'academy-reports') renderAcademyReports();
                     else if(viewId === 'academy-accounts') renderAcademyAccounts();
@@ -401,15 +402,20 @@ function performLogin(role, user) {
         document.getElementById('player-nav').style.display = 'none';
         document.getElementById('academy-nav').style.display = 'flex';
         document.querySelectorAll('#academy-nav .nav-item').forEach(item => {
-            if (item.getAttribute('onclick').includes('academy-users')) {
-                item.style.display = (user && user.type === 'super') ? 'flex' : 'none';
-            } else if (item.getAttribute('onclick').includes('academy-dashboard')) {
+            const onclick = item.getAttribute('onclick') || '';
+            if (onclick.includes('academy-users')) {
+                // Granted to normal user and all admins to view all users!
+                item.style.display = 'flex';
+            } else if (onclick.includes('academy-dashboard')) {
+                // Granted to normal user and all admins!
+                item.style.display = 'flex';
+            } else if (onclick.includes('academy-coach-attendance')) {
+                item.style.display = 'flex';
+            } else if (onclick.includes('academy-pnl')) {
                 item.style.display = (user && (user.type === 'main' || user.type === 'super')) ? 'flex' : 'none';
-            } else if (item.getAttribute('onclick').includes('academy-pnl')) {
-                item.style.display = (user && (user.type === 'main' || user.type === 'super')) ? 'flex' : 'none';
-            } else if (item.getAttribute('onclick').includes('academy-approvals')) {
+            } else if (onclick.includes('academy-approvals')) {
                 item.style.display = (user && user.type === 'super') ? 'flex' : 'none';
-            } else if (item.getAttribute('onclick').includes('academy-accounts')) {
+            } else if (onclick.includes('academy-accounts')) {
                 item.style.display = (user && (user.type === 'main' || user.type === 'super')) ? 'flex' : 'none';
             } else {
                 item.style.display = 'flex';
@@ -494,6 +500,8 @@ function switchView(viewId, event) {
         renderAcademyStudents();
     } else if(viewId === 'academy-attendance') {
         renderAcademyAttendance();
+    } else if(viewId === 'academy-coach-attendance') {
+        renderAcademyCoachAttendance();
     } else if(viewId === 'academy-payments') {
         renderAcademyPayments();
     } else if(viewId === 'academy-reports') {
@@ -1927,15 +1935,68 @@ function openAttendanceHistoryModal() {
 
 // ================= ACADEMY ATTENDANCE LOGIC =================
 
+function getAllCoaches() {
+    const list = [];
+    const seen = new Set();
+    
+    // 1. Coaches registered inside academyStudents
+    (academyStudents || []).forEach(s => {
+        if (s && s.role === 'coach') {
+            const key = String(s.contact || s.id || s.mobile || s.name).trim().toLowerCase();
+            if (key && !seen.has(key)) {
+                seen.add(key);
+                list.push({
+                    id: String(s.id || s.contact),
+                    name: s.name,
+                    mobile: s.contact || s.mobile || s.id,
+                    whatsapp: s.whatsapp || '',
+                    remarks: s.remarks || '',
+                    pic: s.pic || null,
+                    source: 'academy'
+                });
+            }
+        }
+    });
+    
+    // 2. Coaches registered online in coaches array
+    (coaches || []).forEach(c => {
+        if (c) {
+            const key = String(c.mobile || c.id || c.name).trim().toLowerCase();
+            if (key && !seen.has(key)) {
+                seen.add(key);
+                list.push({
+                    id: String(c.id || c.mobile),
+                    name: c.name,
+                    mobile: c.mobile || c.id,
+                    whatsapp: c.whatsapp || '',
+                    remarks: c.remarks || '',
+                    pic: c.pic || null,
+                    source: 'online'
+                });
+            } else if (key) {
+                const existing = list.find(item => String(item.mobile || item.id).trim().toLowerCase() === key);
+                if (existing) {
+                    if (!existing.pic && c.pic) existing.pic = c.pic;
+                    if (!existing.whatsapp && c.whatsapp) existing.whatsapp = c.whatsapp;
+                }
+            }
+        }
+    });
+    
+    return list;
+}
+
 function sanitizeAcademyData(triggerSave = true) {
     if (!Array.isArray(academyStudents) || academyStudents.length === 0) return false;
     const activeStudentIds = new Set(academyStudents.map(s => String(s.id)));
+    const activeCoachIds = new Set(getAllCoaches().map(c => String(c.id)));
+    const allValidIds = new Set([...activeStudentIds, ...activeCoachIds]);
     let changed = false;
 
-    // 1. Remove orphaned attendance records for students who no longer exist
+    // 1. Remove orphaned attendance records for students or coaches who no longer exist
     if (Array.isArray(academyAttendance)) {
         const origAttLen = academyAttendance.length;
-        academyAttendance = academyAttendance.filter(a => a && a.studentId && activeStudentIds.has(String(a.studentId)));
+        academyAttendance = academyAttendance.filter(a => a && a.studentId && allValidIds.has(String(a.studentId)));
         if (academyAttendance.length !== origAttLen) {
             changed = true;
         }
@@ -2034,25 +2095,28 @@ function renderAcademyAttendance() {
     
     list.innerHTML = '';
     
-    if(academyStudents.length === 0) {
+    // Filter genuine students only (exclude coaches so they do not show under student attendance)
+    const genuineStudents = academyStudents.filter(s => s.role !== 'coach');
+    
+    if(genuineStudents.length === 0) {
         list.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 20px;">No students registered yet.</p>';
         document.getElementById('academy-total-strength').innerText = '0 / 0';
         return;
     }
     
     // Accurate total strength for today across all registered students (independent of search query)
-    const totalPresentToday = academyStudents.filter(s => {
+    const totalPresentToday = genuineStudents.filter(s => {
         const r = getAcademyAttendanceForDate(dateStr, s.id);
         return r && r.status === 'Present';
     }).length;
-    document.getElementById('academy-total-strength').innerText = `${totalPresentToday} / ${academyStudents.length}`;
+    document.getElementById('academy-total-strength').innerText = `${totalPresentToday} / ${genuineStudents.length}`;
     
     // Calculate total collected for this specific date
     updateTodayCollectedBadge();
     
     const searchInput = document.getElementById('academy-attendance-search');
     const searchQuery = searchInput ? searchInput.value.toLowerCase() : '';
-    const filteredStudents = academyStudents.filter(s => s.name.toLowerCase().includes(searchQuery));
+    const filteredStudents = genuineStudents.filter(s => s.name.toLowerCase().includes(searchQuery));
     
     filteredStudents.sort((a, b) => {
         let ageA = parseInt(a.age);
@@ -2065,14 +2129,13 @@ function renderAcademyAttendance() {
     filteredStudents.forEach(student => {
         const record = getAcademyAttendanceForDate(dateStr, student.id);
         const isPresent = record && record.status === 'Present';
-        if(isPresent) presentCount++;
         
         // Check payment for the month (YYYY-MM format extracted from dateStr)
         const monthStr = dateStr.substring(0, 7);
         const payment = getAcademyPaymentForMonth(monthStr, student.id);
         const isPaid = payment && payment.status === 'Paid';
         const hasAttended = academyAttendance.some(a => a.studentId === student.id && a.date.startsWith(monthStr) && a.status === 'Present');
-        const nameColor = student.role === 'coach' ? '#3b82f6' : (hasAttended ? (isPaid ? '#10b981' : '#ef4444') : (student.gender === 'Female' ? '#ec4899' : '#fff'));
+        const nameColor = hasAttended ? (isPaid ? '#10b981' : '#ef4444') : (student.gender === 'Female' ? '#ec4899' : '#fff');
         const amount = payment ? payment.amount || payment.paid || '' : '';
         
         const initial = student.name ? student.name.trim().charAt(0).toUpperCase() : 'S';
@@ -2094,8 +2157,8 @@ function renderAcademyAttendance() {
                     ${student.pic ? '' : initial}
                 </div>
                 <div style="overflow: hidden;">
-                    <h3 style="font-size: 1.25rem; font-weight: 600; color: ${nameColor}; white-space: nowrap; text-overflow: ellipsis; overflow: hidden;">${escapeHtml(student.name)} ${student.role === 'coach' ? '<span style="font-size: 0.8rem; background: rgba(59,130,246,0.2); color: #3b82f6; padding: 2px 8px; border-radius: 6px; margin-left: 6px; vertical-align: middle;">Coach</span>' : (student.age && student.age !== '-' ? `<span class="player-age-badge" style="margin-left: 6px;">${student.age} Yrs</span>` : '')} ${isPaid ? '<i class="fa-solid fa-circle-check" style="font-size: 0.95rem; color: #10b981; margin-left: 6px;"></i>' : ''}</h3>
-                    <p style="font-size: 0.95rem; color: var(--text-muted); margin-top: 3px;">ID: <strong style="color: #f1f5f9;">${escapeHtml(student.id)}</strong> ${student.role !== 'coach' ? `| Parent: <strong style="color: #f1f5f9;">${escapeHtml(student.fatherName || 'N/A')}</strong>` : ''}</p>
+                    <h3 style="font-size: 1.25rem; font-weight: 600; color: ${nameColor}; white-space: nowrap; text-overflow: ellipsis; overflow: hidden;">${escapeHtml(student.name)} ${(student.age && student.age !== '-' ? `<span class="player-age-badge" style="margin-left: 6px;">${student.age} Yrs</span>` : '')} ${isPaid ? '<i class="fa-solid fa-circle-check" style="font-size: 0.95rem; color: #10b981; margin-left: 6px;"></i>' : ''}</h3>
+                    <p style="font-size: 0.95rem; color: var(--text-muted); margin-top: 3px;">ID: <strong style="color: #f1f5f9;">${escapeHtml(student.id)}</strong> | Parent: <strong style="color: #f1f5f9;">${escapeHtml(student.fatherName || 'N/A')}</strong></p>
                 </div>
             </div>
             
@@ -2113,14 +2176,145 @@ function renderAcademyAttendance() {
                 
                 <div style="width: 1px; height: 30px; background: #374151; margin: 0 5px;"></div>
                 
-                ${student.role === 'coach' ? '' : `
                 <div style="display: flex; gap: 8px; align-items: center;">
                     <input type="number" id="attendance-fee-${student.id}" value="${amount}" placeholder="SAR" style="width: 90px; padding: 10px; border-radius: 10px; background: rgba(15, 23, 42, 0.8); color: white; border: 1px solid #374151; text-align: center; font-weight: bold; font-size: 0.95rem;" oninput="handleFeeInput(this, '${student.id}', '${monthStr}')">
                     <button id="pay-btn-${student.id}" class="btn-primary" style="padding: 10px 16px; border-radius: 10px; font-size: 0.95rem; font-weight: 600; display: flex; align-items: center; gap: 6px; ${isPaid ? 'background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16,185,129,0.3); opacity: 1;' : (amount > 0 ? 'background: #3b82f6; color: white; border: 1px solid #3b82f6; opacity: 1;' : 'background: #374151; color: #9ca3af; border: 1px solid #374151; opacity: 0.5;')}" onclick="togglePaymentStatusFromAttendance('${student.id}', '${monthStr}')" ${(!isPaid && (!amount || amount <= 0)) || isPaid ? 'disabled' : ''}>
                         <i class="fa-solid fa-wallet"></i> ${isPaid ? 'Paid' : 'Pay'}
                     </button>
                 </div>
-                `}
+            </div>
+        `;
+        list.appendChild(div);
+    });
+}
+
+// ================= COACH ATTENDANCE LOGIC =================
+
+function getAcademyCoachAttendanceForDate(dateStr, coachId) {
+    return academyAttendance.find(a => a.date === dateStr && String(a.studentId) === String(coachId));
+}
+
+function markAcademyCoachAttendance(coachId, dateStr, status) {
+    const coachIdStr = String(coachId);
+    let record = academyAttendance.find(a => a.date === dateStr && String(a.studentId) === coachIdStr);
+    if(record) {
+        record.status = status;
+        record.role = 'coach';
+    } else {
+        academyAttendance.push({ date: dateStr, studentId: coachIdStr, status: status, role: 'coach' });
+    }
+    saveData();
+    renderAcademyCoachAttendance();
+}
+
+function updateAcademyCoachRemark(coachId, value) {
+    const coachIdStr = String(coachId);
+    (academyStudents || []).forEach(s => {
+        if (s.role === 'coach' && (String(s.id) === coachIdStr || String(s.contact) === coachIdStr)) {
+            s.remarks = value;
+        }
+    });
+    (coaches || []).forEach(c => {
+        if (String(c.id) === coachIdStr || String(c.mobile) === coachIdStr) {
+            c.remarks = value;
+        }
+    });
+    saveData();
+}
+
+function renderAcademyCoachAttendance() {
+    const list = document.getElementById('academy-coach-attendance-list');
+    if(!list) return;
+    
+    let dateStr = document.getElementById('academy-coach-attendance-date').value;
+    if(!dateStr) {
+        const today = new Date().toISOString().split('T')[0];
+        const dateInput = document.getElementById('academy-coach-attendance-date');
+        if (dateInput) dateInput.value = today;
+        dateStr = today;
+    }
+    
+    list.innerHTML = '';
+    
+    const allCoaches = getAllCoaches();
+    
+    if(allCoaches.length === 0) {
+        list.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 25px;">No coaches registered yet.</p>';
+        const totalEl = document.getElementById('academy-coach-total-strength');
+        if (totalEl) totalEl.innerText = '0 / 0';
+        const regEl = document.getElementById('academy-coach-total-registered');
+        if (regEl) regEl.innerText = '0 Coaches';
+        return;
+    }
+    
+    const searchInput = document.getElementById('academy-coach-attendance-search');
+    const searchQuery = searchInput ? searchInput.value.toLowerCase().trim() : '';
+    const filteredCoaches = allCoaches.filter(c => 
+        (c.name && c.name.toLowerCase().includes(searchQuery)) || 
+        (c.mobile && c.mobile.includes(searchQuery))
+    );
+    
+    const totalPresentCoaches = allCoaches.filter(c => {
+        const r = getAcademyCoachAttendanceForDate(dateStr, c.id);
+        return r && r.status === 'Present';
+    }).length;
+    
+    const strengthEl = document.getElementById('academy-coach-total-strength');
+    if (strengthEl) strengthEl.innerText = `${totalPresentCoaches} / ${allCoaches.length}`;
+    
+    const registeredEl = document.getElementById('academy-coach-total-registered');
+    if (registeredEl) registeredEl.innerText = `${allCoaches.length} Coaches`;
+
+    if (filteredCoaches.length === 0) {
+        list.innerHTML = `<p style="color: var(--text-muted); text-align: center; padding: 25px;">No coaches match "${escapeHtml(searchQuery)}".</p>`;
+        return;
+    }
+
+    filteredCoaches.forEach(coach => {
+        const record = getAcademyCoachAttendanceForDate(dateStr, coach.id);
+        const isPresent = record && record.status === 'Present';
+        const initial = coach.name ? coach.name.trim().charAt(0).toUpperCase() : 'C';
+        const avatarStyle = coach.pic 
+            ? `background-image: url('${coach.pic}'); background-size: cover; background-position: center;` 
+            : `background: linear-gradient(135deg, #1e3a8a, #2563eb);`;
+
+        const div = document.createElement('div');
+        div.className = 'player-card';
+        div.style.display = 'flex';
+        div.style.alignItems = 'center';
+        div.style.justifyContent = 'space-between';
+        div.style.padding = '16px 22px';
+        div.style.gap = '20px';
+        
+        div.innerHTML = `
+            <div class="player-info" style="display: flex; align-items: center; gap: 16px; min-width: 260px;">
+                <div class="profile-pic" style="min-width: 50px; height: 50px; border-radius: 50%; ${avatarStyle}">
+                    ${coach.pic ? '' : initial}
+                </div>
+                <div style="overflow: hidden;">
+                    <h3 style="font-size: 1.25rem; font-weight: 600; color: #3b82f6; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; margin: 0;">
+                        ${escapeHtml(coach.name)}
+                        <span style="font-size: 0.8rem; background: rgba(59,130,246,0.2); color: #3b82f6; padding: 2px 8px; border-radius: 6px; margin-left: 6px; vertical-align: middle;">Coach</span>
+                        ${isPresent ? '<i class="fa-solid fa-circle-check" style="font-size: 0.95rem; color: #10b981; margin-left: 6px;" title="Present Today"></i>' : ''}
+                    </h3>
+                    <p style="font-size: 0.95rem; color: var(--text-muted); margin-top: 4px;">
+                        Mobile: <strong style="color: #f1f5f9;">${escapeHtml(coach.mobile || coach.id)}</strong>
+                        ${coach.whatsapp ? ` | WhatsApp: <strong style="color: #22c55e;">${escapeHtml(coach.whatsapp)}</strong>` : ''}
+                    </p>
+                </div>
+            </div>
+            
+            <div style="display: flex; align-items: center; gap: 14px; flex: 1; justify-content: flex-end;">
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn-primary" style="padding: 10px 18px; border-radius: 10px; font-size: 0.95rem; font-weight: 600; display: flex; align-items: center; gap: 6px; ${isPresent ? 'background: #10b981; color: white; border-color: #10b981;' : 'opacity: 0.6; background: #374151; border-color: #374151; color: #9ca3af;'}" onclick="markAcademyCoachAttendance('${escapeHtml(coach.id)}', '${dateStr}', 'Present')">
+                        <i class="fa-solid fa-check"></i> Present
+                    </button>
+                    <button class="btn-secondary" style="padding: 10px 18px; border-radius: 10px; font-size: 0.95rem; font-weight: 600; display: flex; align-items: center; gap: 6px; ${!isPresent ? 'background: #ef4444; color: white; border-color: #ef4444;' : 'opacity: 0.6; background: #374151; border-color: #374151; color: #9ca3af;'}" onclick="markAcademyCoachAttendance('${escapeHtml(coach.id)}', '${dateStr}', 'Absent')">
+                        <i class="fa-solid fa-xmark"></i> Absent
+                    </button>
+                </div>
+                
+                <input type="text" maxlength="25" value="${escapeHtml(coach.remarks || '')}" placeholder="Remarks (Max 25)" style="width: 250px; padding: 10px 14px; border-radius: 10px; background: rgba(15, 23, 42, 0.8); color: white; border: 1px solid #374151; font-size: 0.95rem;" onchange="updateAcademyCoachRemark('${escapeHtml(coach.id)}', this.value)">
             </div>
         `;
         list.appendChild(div);
@@ -3041,11 +3235,29 @@ function renderAcademyUsers() {
 
     list.innerHTML = '';
     
+    // Check if current user is super admin or main admin
+    const canManageUsers = currentUser && (currentUser.type === 'super' || currentUser.type === 'main');
+    const formContainer = document.getElementById('academy-add-user-container');
+    if (formContainer) {
+        formContainer.style.display = canManageUsers ? 'block' : 'none';
+    }
+    
     academyAdmins.forEach(admin => {
         const isSuper = admin.type === 'super';
         const typeLabel = admin.type === 'super' ? 'Super Admin' : (admin.type === 'main' ? 'Main User' : 'Normal User');
         const color = admin.type === 'super' ? '#8b5cf6' : (admin.type === 'main' ? '#10b981' : '#38bdf8');
         
+        let actionHtml = '-';
+        if (currentUser && currentUser.type === 'super' && !isSuper) {
+            actionHtml = `
+                <button class="btn-secondary" style="padding: 4px 8px; font-size: 0.75rem; border-color: #ef4444; color: #ef4444;" onclick="deleteAcademyUser('${admin.username}')">
+                    <i class="fa-solid fa-trash"></i>
+                </button>
+            `;
+        } else if (isSuper) {
+            actionHtml = `<i class="fa-solid fa-lock" style="color: var(--text-muted);" title="Protected Super Admin"></i>`;
+        }
+
         list.innerHTML += `
             <div class="player-card" style="display: flex; align-items: center; padding: 12px 20px; border-radius: 8px; margin-bottom: 8px; background: rgba(15, 23, 42, 0.8); border: 1px solid #374151;">
                 <div style="flex: 2; min-width: 200px; color: #fff; font-weight: bold;">
@@ -3058,14 +3270,49 @@ function renderAcademyUsers() {
                     ${typeLabel}
                 </div>
                 <div style="width: 80px; text-align: center;">
-                    ${isSuper ? '<i class="fa-solid fa-lock" style="color: var(--text-muted);" title="Cannot delete Super Admin"></i>' : 
-                    `<button class="btn-secondary" style="padding: 4px 8px; font-size: 0.75rem; border-color: #ef4444; color: #ef4444;" onclick="deleteAcademyUser('${admin.username}')">
-                        <i class="fa-solid fa-trash"></i>
-                    </button>`}
+                    ${actionHtml}
                 </div>
             </div>
         `;
     });
+
+    // Populate Registered Coaches list
+    const coachListEl = document.getElementById('academy-coaches-users-list');
+    if (coachListEl) {
+        coachListEl.innerHTML = '';
+        const allCoaches = getAllCoaches();
+        if (allCoaches.length === 0) {
+            coachListEl.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 20px;">No registered coaches found.</p>';
+        } else {
+            allCoaches.forEach(c => {
+                const initial = c.name ? c.name.trim().charAt(0).toUpperCase() : 'C';
+                const avatarStyle = c.pic ? `background-image: url('${c.pic}'); background-size: cover;` : `background: linear-gradient(135deg, #1e3a8a, #2563eb);`;
+                const cleanPhone = (c.whatsapp || c.mobile || '').replace(/\D/g, '');
+                const waLink = cleanPhone ? `<a href="https://wa.me/${cleanPhone}" target="_blank" style="color: #22c55e; font-weight: 600; text-decoration: none;"><i class="fa-brands fa-whatsapp"></i> Chat</a>` : '-';
+                
+                coachListEl.innerHTML += `
+                    <div class="player-card" style="display: flex; align-items: center; padding: 12px 20px; border-radius: 8px; margin-bottom: 8px; background: rgba(15, 23, 42, 0.8); border: 1px solid #374151;">
+                        <div style="flex: 2; min-width: 200px; display: flex; align-items: center; gap: 10px; color: #fff; font-weight: bold;">
+                            <div class="profile-pic" style="min-width: 34px; width: 34px; height: 34px; font-size: 0.85rem; border-radius: 50%; ${avatarStyle}">
+                                ${c.pic ? '' : initial}
+                            </div>
+                            <span>${escapeHtml(c.name)}</span>
+                        </div>
+                        <div style="flex: 2; min-width: 200px; color: #38bdf8; font-family: monospace; font-size: 0.95rem;">
+                            ${escapeHtml(c.mobile || c.id)}
+                        </div>
+                        <div style="width: 150px; font-weight: bold; color: #3b82f6;">
+                            <span style="font-size: 0.8rem; background: rgba(59,130,246,0.15); color: #3b82f6; padding: 2px 8px; border-radius: 6px;">Coach</span>
+                            <span style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-top: 2px;">${c.source === 'online' ? 'Online Reg' : 'Academy'}</span>
+                        </div>
+                        <div style="width: 140px; text-align: center;">
+                            ${waLink}
+                        </div>
+                    </div>
+                `;
+            });
+        }
+    }
 }
 
 function addAcademyUser() {

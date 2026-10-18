@@ -93,7 +93,10 @@ app.get('/api/data', async (req, res) => {
         const data = await getAppData();
         // Server-side safety cleanup: if students were deleted, remove any orphaned attendance or payment records
         if (data.academyStudents && Array.isArray(data.academyStudents) && data.academyStudents.length > 0) {
-            const validIds = new Set(data.academyStudents.map(s => String(s.id)));
+            const validIds = new Set([
+                ...data.academyStudents.map(s => String(s.id)),
+                ...(data.coaches || []).map(c => String(c.id || c.mobile))
+            ]);
             let modified = false;
             if (data.academyAttendance && Array.isArray(data.academyAttendance)) {
                 const cleanAtt = data.academyAttendance.filter(a => a && a.studentId && validIds.has(String(a.studentId)));
