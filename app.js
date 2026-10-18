@@ -408,8 +408,8 @@ function performLogin(role, user) {
         document.querySelectorAll('#academy-nav .nav-item').forEach(item => {
             const onclick = item.getAttribute('onclick') || '';
             if (onclick.includes('academy-users')) {
-                // Granted to normal user and all admins to view all users!
-                item.style.display = 'flex';
+                // Access only for super admin (rolled back from main user and normal user)
+                item.style.display = (user && user.type === 'super') ? 'flex' : 'none';
             } else if (onclick.includes('academy-dashboard')) {
                 // Granted to normal user and all admins!
                 item.style.display = 'flex';
@@ -515,6 +515,9 @@ function switchView(viewId, event) {
     } else if(viewId === 'academy-accounts') {
         renderAcademyAccounts();
     } else if(viewId === 'academy-users') {
+        if (!currentUser || currentUser.type !== 'super') {
+            return switchView('academy-admin');
+        }
         renderAcademyUsers();
     } else if(viewId === 'academy-pnl') {
         renderPnL();
@@ -3892,13 +3895,14 @@ function exportAcademyAccountsToExcel() {
 // ================= ACADEMY USERS LOGIC =================
 
 function renderAcademyUsers() {
+    if (!currentUser || currentUser.type !== 'super') return;
     const list = document.getElementById('academy-users-list');
     if (!list) return;
 
     list.innerHTML = '';
     
-    // Check if current user is super admin or main admin
-    const canManageUsers = currentUser && (currentUser.type === 'super' || currentUser.type === 'main');
+    // Check if current user is super admin
+    const canManageUsers = currentUser && currentUser.type === 'super';
     const formContainer = document.getElementById('academy-add-user-container');
     if (formContainer) {
         formContainer.style.display = canManageUsers ? 'block' : 'none';
