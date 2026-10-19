@@ -16,6 +16,7 @@ let coaches = [];
 let academyAccounts = [];
 let academyAdmins = [];
 let coachSalaries = [];
+let closedAccountMonths = [];
 
 async function initData() {
     try {
@@ -58,6 +59,7 @@ async function initData() {
             coaches = data.coaches || [];
             academyAccounts = data.academyAccounts || [];
             coachSalaries = data.coachSalaries || [];
+            closedAccountMonths = data.closedAccountMonths || [];
             
             academyAdmins = data.academyAdmins && data.academyAdmins.length ? data.academyAdmins : [
                 { username: 'pmnoushu010', password: 'Shanumon@12345$$', type: 'super' },
@@ -113,7 +115,8 @@ initData();
 function saveData() {
     const dataToSave = {
         players, pendingUsers, messages, matches, practiceSession, 
-        attendance, academyStudents, academyAttendance, academyPayments, coaches, academyAccounts, academyAdmins, coachSalaries
+        attendance, academyStudents, academyAttendance, academyPayments, coaches, academyAccounts, academyAdmins, coachSalaries,
+        closedAccountMonths
     };
     fetch('/api/data', {
         method: 'POST',
@@ -147,6 +150,7 @@ setInterval(async () => {
             if(data.academyAccounts) academyAccounts = data.academyAccounts;
             if(data.academyAdmins) academyAdmins = data.academyAdmins;
             if(data.coachSalaries) coachSalaries = data.coachSalaries;
+            if(data.closedAccountMonths) closedAccountMonths = data.closedAccountMonths;
 
             sanitizeAcademyData(false);
 
@@ -2687,11 +2691,15 @@ function updateCoachBaseSalary(coachId, value) {
         const expectedAccId = `acc_csal_${coachIdStr}_${monthStr}`;
         const accEntry = (academyAccounts || []).find(a => a.id === expectedAccId);
         if (accEntry) {
-            const coachObj = getAllCoaches().find(c => String(c.id) === coachIdStr);
-            if (coachObj) {
-                const calc = calculateCoachSalaryDetails(coachObj, monthStr);
-                accEntry.amount = calc.netSalary;
-                accEntry.description = `Coach Salary: ${coachObj.name} (${monthStr}) [${calc.presentCount}/${calc.totalWorkingDays} days, ${calc.leaveDays} leave]`;
+            if (isAccountMonthClosed(monthStr) && (!currentUser || currentUser.type !== 'super')) {
+                alert(`Notice: Accounts for ${monthStr} are closed. Coach base salary updated, but closed accounts statement cannot be modified by main users.`);
+            } else {
+                const coachObj = getAllCoaches().find(c => String(c.id) === coachIdStr);
+                if (coachObj) {
+                    const calc = calculateCoachSalaryDetails(coachObj, monthStr);
+                    accEntry.amount = calc.netSalary;
+                    accEntry.description = `Coach Salary: ${coachObj.name} (${monthStr}) [${calc.presentCount}/${calc.totalWorkingDays} days, ${calc.leaveDays} leave]`;
+                }
             }
         }
     }
@@ -2719,11 +2727,15 @@ function updateCoachLeaveDays(coachId, monthStr, value) {
     const expectedAccId = `acc_csal_${coachIdStr}_${monthStr}`;
     const accEntry = (academyAccounts || []).find(a => a.id === expectedAccId);
     if (accEntry) {
-        const coachObj = getAllCoaches().find(c => String(c.id) === coachIdStr);
-        if (coachObj) {
-            const calc = calculateCoachSalaryDetails(coachObj, monthStr);
-            accEntry.amount = calc.netSalary;
-            accEntry.description = `Coach Salary: ${coachObj.name} (${monthStr}) [${calc.presentCount}/${calc.totalWorkingDays} days, ${calc.leaveDays} leave]`;
+        if (isAccountMonthClosed(monthStr) && (!currentUser || currentUser.type !== 'super')) {
+            alert(`Notice: Accounts for ${monthStr} are closed. Coach leave days updated, but closed accounts statement cannot be modified by main users.`);
+        } else {
+            const coachObj = getAllCoaches().find(c => String(c.id) === coachIdStr);
+            if (coachObj) {
+                const calc = calculateCoachSalaryDetails(coachObj, monthStr);
+                accEntry.amount = calc.netSalary;
+                accEntry.description = `Coach Salary: ${coachObj.name} (${monthStr}) [${calc.presentCount}/${calc.totalWorkingDays} days, ${calc.leaveDays} leave]`;
+            }
         }
     }
     
@@ -2735,6 +2747,10 @@ function updateCoachLeaveDays(coachId, monthStr, value) {
 }
 
 function postCoachSalaryToAccounts(coachId, monthStr) {
+    if (isAccountMonthClosed(monthStr) && (!currentUser || currentUser.type !== 'super')) {
+        return alert(`Accounts for ${monthStr} are closed. Only Super Admin can modify or post salaries to closed accounts.`);
+    }
+
     const allCoaches = getAllCoaches();
     const coach = allCoaches.find(c => String(c.id) === String(coachId));
     if (!coach) return alert("Coach not found.");
@@ -2786,6 +2802,10 @@ function postCoachSalaryToAccounts(coachId, monthStr) {
 }
 
 function removeCoachSalaryFromAccounts(coachId, monthStr) {
+    if (isAccountMonthClosed(monthStr) && (!currentUser || currentUser.type !== 'super')) {
+        return alert(`Accounts for ${monthStr} are closed. Only Super Admin can remove salaries from closed accounts.`);
+    }
+
     if (!confirm("Are you sure you want to remove this salary expense from Accounts?")) return;
     
     const expectedAccId = `acc_csal_${coachId}_${monthStr}`;
@@ -2810,6 +2830,10 @@ function syncAllCoachSalariesToAccounts() {
     const monthInput = document.getElementById('academy-salary-month');
     const monthStr = monthInput ? monthInput.value : '';
     if (!monthStr) return alert("Please select a valid month.");
+
+    if (isAccountMonthClosed(monthStr) && (!currentUser || currentUser.type !== 'super')) {
+        return alert(`Accounts for ${monthStr} are closed. Only Super Admin can sync salaries to closed accounts.`);
+    }
     
     const allCoaches = getAllCoaches();
     let count = 0;
@@ -3694,6 +3718,127 @@ function viewStudentReportHistory(studentId) {
 
 // ================= ACADEMY ACCOUNTS LOGIC =================
 
+function isAccountMonthClosed(monthOrDate) {
+    if (!monthOrDate || !Array.isArray(closedAccountMonths)) return false;
+    const targetMonth = monthOrDate.length >= 7 ? monthOrDate.substring(0, 7) : monthOrDate;
+    return closedAccountMonths.some(m => {
+        const mStr = typeof m === 'string' ? m : (m && m.month ? m.month : '');
+        return mStr === targetMonth;
+    });
+}
+
+function closeAccountMonth() {
+    let monthStr = document.getElementById('academy-account-month').value;
+    if (!monthStr) {
+        const today = new Date();
+        const y = today.getFullYear();
+        const m = String(today.getMonth() + 1).padStart(2, '0');
+        monthStr = `${y}-${m}`;
+    }
+
+    if (isAccountMonthClosed(monthStr)) {
+        return alert(`Account for ${monthStr} is already closed.`);
+    }
+
+    const d = new Date(monthStr + '-01');
+    const monthName = !isNaN(d) ? d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : monthStr;
+
+    const confirmMsg = `Are you sure you want to CLOSE the accounts for ${monthName}?\n\nOnce closed:\n• Main users will NOT be able to add, edit, or delete transactions for this month.\n• Only Super Admin will have access to make changes.\n\nDo you want to proceed?`;
+    if (!confirm(confirmMsg)) return;
+
+    if (!Array.isArray(closedAccountMonths)) closedAccountMonths = [];
+    closedAccountMonths.push({
+        month: monthStr,
+        closedAt: new Date().toISOString(),
+        closedBy: currentUser ? (currentUser.id || currentUser.name || 'User') : 'Admin'
+    });
+
+    saveData();
+    renderAcademyAccounts();
+    alert(`Accounts for ${monthName} are now CLOSED.\nOnly Super Admin has access to modify transactions.`);
+}
+
+function reopenAccountMonth() {
+    if (!currentUser || currentUser.type !== 'super') {
+        return alert("Access denied. Only Super Admin can reopen closed accounts.");
+    }
+
+    let monthStr = document.getElementById('academy-account-month').value;
+    if (!monthStr) return;
+
+    if (!isAccountMonthClosed(monthStr)) {
+        return alert(`Account for ${monthStr} is not closed.`);
+    }
+
+    const d = new Date(monthStr + '-01');
+    const monthName = !isNaN(d) ? d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : monthStr;
+
+    const confirmMsg = `Are you sure you want to REOPEN the accounts for ${monthName}?\n\nMain users will regain permission to add, edit, and delete transactions for this month.`;
+    if (!confirm(confirmMsg)) return;
+
+    closedAccountMonths = (closedAccountMonths || []).filter(m => {
+        const mStr = typeof m === 'string' ? m : (m && m.month ? m.month : '');
+        return mStr !== monthStr;
+    });
+
+    saveData();
+    renderAcademyAccounts();
+    alert(`Accounts for ${monthName} have been successfully REOPENED.`);
+}
+
+function openEditAccountModal(id) {
+    const entry = (academyAccounts || []).find(a => a.id === id);
+    if (!entry) return alert("Transaction not found.");
+
+    const entryMonth = entry.month || (entry.date ? entry.date.substring(0, 7) : '');
+    if (isAccountMonthClosed(entryMonth) && (!currentUser || currentUser.type !== 'super')) {
+        return alert(`Accounts for ${entryMonth} are closed. Only Super Admin can edit transactions.`);
+    }
+
+    document.getElementById('edit-acc-id').value = entry.id;
+    document.getElementById('edit-acc-date').value = entry.date || '';
+    document.getElementById('edit-acc-desc').value = entry.description || '';
+    document.getElementById('edit-acc-amount').value = entry.amount || '';
+    document.getElementById('edit-acc-type').value = entry.type || 'expense';
+
+    document.getElementById('edit-account-modal').classList.add('active');
+}
+
+function saveEditedAccountEntry() {
+    const id = document.getElementById('edit-acc-id').value;
+    const date = document.getElementById('edit-acc-date').value;
+    const desc = document.getElementById('edit-acc-desc').value.trim();
+    const amountVal = document.getElementById('edit-acc-amount').value;
+    const type = document.getElementById('edit-acc-type').value;
+
+    if (!id || !date || !desc || !amountVal) {
+        return alert("Please fill all fields with valid data.");
+    }
+    const amount = parseFloat(amountVal);
+    if (isNaN(amount) || amount < 0) {
+        return alert("Please enter a valid amount.");
+    }
+
+    const entry = (academyAccounts || []).find(a => a.id === id);
+    if (!entry) return alert("Transaction not found.");
+
+    const originalMonth = entry.month || (entry.date ? entry.date.substring(0, 7) : '');
+    const newMonth = date.substring(0, 7);
+
+    if ((isAccountMonthClosed(originalMonth) || isAccountMonthClosed(newMonth)) && (!currentUser || currentUser.type !== 'super')) {
+        return alert("Accounts for this month are closed. Only Super Admin can edit transactions.");
+    }
+
+    entry.date = date;
+    entry.description = desc;
+    entry.amount = amount;
+    entry.type = type;
+
+    saveData();
+    closeModal();
+    renderAcademyAccounts();
+}
+
 function renderAcademyAccounts() {
     const list = document.getElementById('academy-accounts-list');
     if (!list) return;
@@ -3705,6 +3850,93 @@ function renderAcademyAccounts() {
         const m = String(today.getMonth() + 1).padStart(2, '0');
         monthStr = `${y}-${m}`;
         document.getElementById('academy-account-month').value = monthStr;
+    }
+
+    // Default the date input in Add form to current month
+    const dateInput = document.getElementById('acc-input-date');
+    if (dateInput) {
+        const todayStr = new Date().toISOString().split('T')[0];
+        dateInput.value = todayStr.startsWith(monthStr) ? todayStr : `${monthStr}-01`;
+    }
+
+    const isClosed = isAccountMonthClosed(monthStr);
+    const isSuperAdmin = currentUser && currentUser.type === 'super';
+    const canModify = !isClosed || isSuperAdmin;
+
+    const d = new Date(monthStr + '-01');
+    const formattedMonth = !isNaN(d) ? d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : monthStr;
+
+    // 1. Update Status Container in Header
+    const statusContainer = document.getElementById('academy-account-status-container');
+    if (statusContainer) {
+        if (!isClosed) {
+            statusContainer.innerHTML = `
+                <button class="btn-warning" id="btn-close-account" onclick="closeAccountMonth()" style="padding: 8px 14px; border-radius: 8px; font-weight: 600; font-size: 0.88rem; cursor: pointer; display: flex; align-items: center; gap: 7px; background: rgba(245, 158, 11, 0.18); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.4); transition: all 0.2s;" title="Close accounts for ${formattedMonth}">
+                    <i class="fa-solid fa-lock"></i> Account Close
+                </button>
+            `;
+        } else {
+            let statusHtml = `
+                <span style="background: rgba(239, 68, 68, 0.18); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.4); padding: 7px 12px; border-radius: 8px; font-size: 0.85rem; font-weight: 700; display: inline-flex; align-items: center; gap: 6px;">
+                    <i class="fa-solid fa-lock"></i> Closed
+                </span>
+            `;
+            if (isSuperAdmin) {
+                statusHtml += `
+                    <button class="btn-secondary" id="btn-reopen-account" onclick="reopenAccountMonth()" style="padding: 7px 12px; border-radius: 8px; font-weight: 600; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; gap: 6px; border-color: #10b981; color: #10b981; background: rgba(16, 185, 129, 0.1);" title="Reopen accounts for ${formattedMonth}">
+                        <i class="fa-solid fa-lock-open"></i> Reopen
+                    </button>
+                `;
+            }
+            statusContainer.innerHTML = statusHtml;
+        }
+    }
+
+    // 2. Update Add Form Container & Month Closed Banner
+    const bannerEl = document.getElementById('account-month-closed-banner');
+    const formCard = document.getElementById('account-add-form-card');
+    const adminTag = document.getElementById('account-form-admin-tag');
+
+    if (bannerEl && formCard) {
+        if (!isClosed) {
+            bannerEl.style.display = 'none';
+            formCard.style.display = 'block';
+            if (adminTag) adminTag.style.display = 'none';
+            document.querySelectorAll('#account-add-form-inputs input, #account-add-form-inputs select, #acc-btn-add').forEach(el => el.disabled = false);
+        } else if (isClosed && !isSuperAdmin) {
+            // Main user: locked out of adding/editing
+            bannerEl.style.display = 'flex';
+            bannerEl.innerHTML = `
+                <div style="background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 12px; padding: 16px 20px; display: flex; align-items: center; gap: 16px; width: 100%;">
+                    <div style="width: 44px; height: 44px; border-radius: 10px; background: rgba(239, 68, 68, 0.2); display: flex; align-items: center; justify-content: center; color: #ef4444; font-size: 1.3rem; flex-shrink: 0;">
+                        <i class="fa-solid fa-lock"></i>
+                    </div>
+                    <div style="flex: 1;">
+                        <div style="font-size: 1.05rem; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 8px;">
+                            Account Closed for ${formattedMonth}
+                            <span style="font-size: 0.75rem; background: rgba(239, 68, 68, 0.2); color: #ef4444; padding: 2px 8px; border-radius: 6px; font-weight: 600;">Locked</span>
+                        </div>
+                        <p style="margin: 4px 0 0 0; color: var(--text-muted); font-size: 0.88rem;">
+                            Accounts for this month have been finalized and closed. Main users cannot add, edit, or delete transactions. If modifications are required, please contact Super Admin.
+                        </p>
+                    </div>
+                </div>
+            `;
+            formCard.style.display = 'none';
+        } else if (isClosed && isSuperAdmin) {
+            // Super Admin: elevated access to add/edit
+            bannerEl.style.display = 'none';
+            formCard.style.display = 'block';
+            if (adminTag) {
+                adminTag.style.display = 'block';
+                adminTag.innerHTML = `
+                    <span style="background: rgba(139, 92, 246, 0.2); color: #c4b5fd; border: 1px solid rgba(139, 92, 246, 0.4); padding: 4px 10px; border-radius: 6px; font-size: 0.78rem; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
+                        <i class="fa-solid fa-shield-halved"></i> Super Admin Override (Month Closed)
+                    </span>
+                `;
+            }
+            document.querySelectorAll('#account-add-form-inputs input, #account-add-form-inputs select, #acc-btn-add').forEach(el => el.disabled = false);
+        }
     }
 
     list.innerHTML = '';
@@ -3729,7 +3961,7 @@ function renderAcademyAccounts() {
                 </div>
                 <div style="width: 130px; text-align: right; color: #10b981; font-weight: 700; font-size: 1.05rem;">${totalFees} SAR</div>
                 <div style="width: 130px; text-align: right; color: #ef4444; font-size: 1.05rem;">-</div>
-                <div style="width: 60px; text-align: center;"><i class="fa-solid fa-lock" style="color: var(--text-muted); font-size: 1rem;" title="Auto-calculated"></i></div>
+                <div style="width: 90px; text-align: center;"><i class="fa-solid fa-lock" style="color: var(--text-muted); font-size: 1rem;" title="Auto-calculated from payments"></i></div>
             </div>
         `;
     }
@@ -3752,6 +3984,25 @@ function renderAcademyAccounts() {
         const isCoachSalary = entry.category === 'Coach Salary' || (entry.description && entry.description.startsWith('Coach Salary'));
         const coachIcon = isCoachSalary ? '<i class="fa-solid fa-user-tie" style="color: #ef4444; margin-right: 8px;"></i>' : '';
         
+        let actionButtonsHtml = '';
+        if (canModify) {
+            actionButtonsHtml = `
+                <div style="display: flex; align-items: center; justify-content: center; gap: 6px;">
+                    ${!isCoachSalary ? `
+                    <button class="btn-secondary" style="padding: 6px 9px; font-size: 0.85rem; border-color: #38bdf8; color: #38bdf8;" onclick="openEditAccountModal('${entry.id}')" title="Edit Transaction">
+                        <i class="fa-solid fa-pen-to-square"></i>
+                    </button>` : ''}
+                    <button class="btn-secondary" style="padding: 6px 9px; font-size: 0.85rem; border-color: #ef4444; color: #ef4444;" onclick="deleteAccountEntry('${entry.id}')" title="Delete Transaction">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                </div>
+            `;
+        } else {
+            actionButtonsHtml = `
+                <i class="fa-solid fa-lock" style="color: #64748b; font-size: 1rem;" title="Account closed - Modifications restricted to Super Admin"></i>
+            `;
+        }
+
         list.innerHTML += `
             <div class="player-card" style="display: flex; align-items: center; padding: 15px 22px; border-radius: 12px; margin-bottom: 10px; background: rgba(15, 23, 42, 0.8); border: 1px solid ${isCoachSalary ? 'rgba(239, 68, 68, 0.35)' : '#374151'};">
                 <div style="width: 140px; color: var(--text-muted); font-size: 0.95rem; font-weight: 500;">${escapeHtml(entry.date)}</div>
@@ -3761,10 +4012,8 @@ function renderAcademyAccounts() {
                 </div>
                 <div style="width: 130px; text-align: right; color: #10b981; font-weight: 700; font-size: 1.05rem;">${isInc ? amount + ' SAR' : '-'}</div>
                 <div style="width: 130px; text-align: right; color: #ef4444; font-weight: 700; font-size: 1.05rem;">${!isInc ? amount + ' SAR' : '-'}</div>
-                <div style="width: 60px; text-align: center;">
-                    <button class="btn-secondary" style="padding: 6px 10px; font-size: 0.85rem; border-color: #ef4444; color: #ef4444;" onclick="deleteAccountEntry('${entry.id}')">
-                        <i class="fa-solid fa-trash"></i>
-                    </button>
+                <div style="width: 90px; text-align: center;">
+                    ${actionButtonsHtml}
                 </div>
             </div>
         `;
@@ -3794,6 +4043,11 @@ function addAccountEntry() {
         return alert("Please fill all fields (Date, Description, Amount) to add an entry.");
     }
 
+    const entryMonth = date.substring(0, 7);
+    if (isAccountMonthClosed(entryMonth) && (!currentUser || currentUser.type !== 'super')) {
+        return alert(`Accounts for ${entryMonth} are closed. Only Super Admin can add transactions for this month.`);
+    }
+
     academyAccounts.push({
         id: 'acc_' + Date.now(),
         date: date,
@@ -3810,9 +4064,17 @@ function addAccountEntry() {
 }
 
 function deleteAccountEntry(id) {
-    if(!confirm("Are you sure you want to delete this transaction?")) return;
     const deletedEntry = (academyAccounts || []).find(a => a.id === id);
-    if (deletedEntry && (deletedEntry.category === 'Coach Salary' || (deletedEntry.description && deletedEntry.description.startsWith('Coach Salary')))) {
+    if (!deletedEntry) return;
+
+    const entryMonth = deletedEntry.month || (deletedEntry.date ? deletedEntry.date.substring(0, 7) : '');
+    if (entryMonth && isAccountMonthClosed(entryMonth) && (!currentUser || currentUser.type !== 'super')) {
+        return alert(`Accounts for ${entryMonth} are closed. Only Super Admin can delete transactions.`);
+    }
+
+    if(!confirm("Are you sure you want to delete this transaction?")) return;
+
+    if (deletedEntry.category === 'Coach Salary' || (deletedEntry.description && deletedEntry.description.startsWith('Coach Salary'))) {
         const coachIdStr = String(deletedEntry.coachId || '');
         const monthStr = deletedEntry.month || (deletedEntry.date ? deletedEntry.date.substring(0, 7) : '');
         if (coachIdStr && monthStr) {
@@ -3843,7 +4105,12 @@ function exportAcademyAccountsToExcel() {
         monthStr = `${y}-${m}`;
     }
 
+    const isClosed = isAccountMonthClosed(monthStr);
+
     const data = [
+        ["MUFC Academy - Account Statement", "", "", ""],
+        ["Period", monthStr, "Status", isClosed ? "CLOSED" : "OPEN"],
+        [],
         ["Date", "Description", "Income (SAR)", "Expense (SAR)"]
     ];
 

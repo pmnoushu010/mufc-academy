@@ -687,14 +687,17 @@
                 </section>
 
                 <section id="view-academy-accounts" class="view">
-                    <div class="view-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <div class="view-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
                         <div>
                             <h2>Account Statement</h2>
                             <p style="font-size: 0.8rem; color: var(--text-muted);">Manage balance sheet and expenses</p>
                         </div>
-                        <div style="display: flex; gap: 15px; align-items: center;">
-                            <input type="month" id="academy-account-month" class="form-select" style="padding: 8px; width: 140px; background: rgba(15, 23, 42, 0.8);" onclick="this.showPicker()" onchange="renderAcademyAccounts()">
-                            <button class="btn-primary" onclick="exportAcademyAccountsToExcel()"><i class="fa-solid fa-file-excel"></i> Export</button>
+                        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                            <input type="month" id="academy-account-month" class="form-select" style="padding: 8px 10px; width: 145px; background: rgba(15, 23, 42, 0.8);" onclick="this.showPicker()" onchange="renderAcademyAccounts()">
+                            <div id="academy-account-status-container" style="display: flex; align-items: center; gap: 8px;">
+                                <!-- Populated dynamically: Account Close button or Closed badge / Reopen button -->
+                            </div>
+                            <button class="btn-primary" style="padding: 8px 14px; font-size: 0.88rem;" onclick="exportAcademyAccountsToExcel()"><i class="fa-solid fa-file-excel"></i> Export</button>
                         </div>
                     </div>
 
@@ -723,21 +726,27 @@
                         </div>
                     </div>
 
+                    <!-- Month Closed Notice Banner (Shown for Main Users when month is closed) -->
+                    <div id="account-month-closed-banner" style="display: none; margin-bottom: 20px;"></div>
+
                     <!-- Add Entry Form -->
-                    <div style="background: var(--bg-card); padding: 15px; border-radius: 12px; border: 1px solid #374151; margin-bottom: 20px;">
-                        <h3 style="font-size: 0.95rem; margin-bottom: 12px; color: var(--text-muted);">Add New Transaction</h3>
-                        <div style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;">
+                    <div id="account-add-form-card" style="background: var(--bg-card); padding: 15px; border-radius: 12px; border: 1px solid #374151; margin-bottom: 20px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+                            <h3 style="font-size: 0.95rem; margin: 0; color: var(--text-muted);">Add New Transaction</h3>
+                            <div id="account-form-admin-tag" style="display: none;"></div>
+                        </div>
+                        <div id="account-add-form-inputs" style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;">
                             <div style="flex: 1; min-width: 120px;">
                                 <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Date</label>
                                 <input type="date" id="acc-input-date" class="form-input" style="width: 100%; padding: 10px; border-radius: 8px; background: rgba(15, 23, 42, 0.8); color: white; border: 1px solid #374151;" onclick="this.showPicker()">
                             </div>
                             <div style="flex: 2; min-width: 200px;">
                                 <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Description</label>
-                                <input type="text" id="acc-input-desc" class="form-input" style="width: 100%; padding: 10px; border-radius: 8px; background: rgba(15, 23, 42, 0.8); color: white; border: 1px solid #374151;">
+                                <input type="text" id="acc-input-desc" placeholder="e.g. Field Rent, Equipment, Balls..." class="form-input" style="width: 100%; padding: 10px; border-radius: 8px; background: rgba(15, 23, 42, 0.8); color: white; border: 1px solid #374151;">
                             </div>
                             <div style="flex: 1; min-width: 120px;">
                                 <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Amount (SAR)</label>
-                                <input type="number" id="acc-input-amount" class="form-input" style="width: 100%; padding: 10px; border-radius: 8px; background: rgba(15, 23, 42, 0.8); color: white; border: 1px solid #374151;">
+                                <input type="number" id="acc-input-amount" step="0.01" placeholder="0.00" class="form-input" style="width: 100%; padding: 10px; border-radius: 8px; background: rgba(15, 23, 42, 0.8); color: white; border: 1px solid #374151;">
                             </div>
                             <div style="flex: 1; min-width: 120px;">
                                 <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Type</label>
@@ -746,7 +755,7 @@
                                     <option value="income">Income (+)</option>
                                 </select>
                             </div>
-                            <button class="btn-primary" style="padding: 10px 15px; border-radius: 8px; height: 42px;" onclick="addAccountEntry()">
+                            <button id="acc-btn-add" class="btn-primary" style="padding: 10px 15px; border-radius: 8px; height: 42px;" onclick="addAccountEntry()">
                                 <i class="fa-solid fa-plus"></i> Add
                             </button>
                         </div>
@@ -754,11 +763,11 @@
                     
                     <!-- Account Statement Table -->
                     <div style="display: flex; align-items: center; padding: 0 20px 10px 20px; color: var(--text-muted); font-size: 0.95rem; font-weight: bold; border-bottom: 1px solid #374151; margin-bottom: 10px;">
-                        <div style="width: 120px;">Date</div>
+                        <div style="width: 140px;">Date</div>
                         <div style="flex: 1; min-width: 200px;">Description</div>
-                        <div style="width: 120px; text-align: right; color: #10b981;">Income (+)</div>
-                        <div style="width: 120px; text-align: right; color: #ef4444;">Expense (-)</div>
-                        <div style="width: 60px; text-align: center;">Action</div>
+                        <div style="width: 130px; text-align: right; color: #10b981;">Income (+)</div>
+                        <div style="width: 130px; text-align: right; color: #ef4444;">Expense (-)</div>
+                        <div style="width: 90px; text-align: center;">Action</div>
                     </div>
                     
                     <div id="academy-accounts-list" class="player-list">
@@ -1338,7 +1347,43 @@
             </div>
         </div>
 
+        <!-- Edit Account Transaction Modal -->
+        <div id="edit-account-modal" class="modal">
+            <div class="modal-content" style="max-width: 480px; width: 92%;">
+                <div class="modal-header">
+                    <h2>Edit Transaction</h2>
+                    <button class="close-btn" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div class="modal-body" style="padding: 20px;">
+                    <input type="hidden" id="edit-acc-id">
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 5px;">Date</label>
+                        <input type="date" id="edit-acc-date" class="form-input" style="width: 100%; padding: 10px; border-radius: 8px; background: rgba(15, 23, 42, 0.8); color: white; border: 1px solid #374151;" onclick="this.showPicker()">
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 5px;">Description</label>
+                        <input type="text" id="edit-acc-desc" class="form-input" style="width: 100%; padding: 10px; border-radius: 8px; background: rgba(15, 23, 42, 0.8); color: white; border: 1px solid #374151;">
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 5px;">Amount (SAR)</label>
+                        <input type="number" id="edit-acc-amount" step="0.01" class="form-input" style="width: 100%; padding: 10px; border-radius: 8px; background: rgba(15, 23, 42, 0.8); color: white; border: 1px solid #374151;">
+                    </div>
+                    <div style="margin-bottom: 22px;">
+                        <label style="display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 5px;">Type</label>
+                        <select id="edit-acc-type" class="form-select" style="width: 100%; padding: 10px; border-radius: 8px; background: rgba(15, 23, 42, 0.8); color: white; border: 1px solid #374151;">
+                            <option value="expense">Expense (-)</option>
+                            <option value="income">Income (+)</option>
+                        </select>
+                    </div>
+                    <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                        <button class="btn-secondary" style="padding: 10px 18px;" onclick="closeModal()">Cancel</button>
+                        <button class="btn-primary" style="padding: 10px 20px;" onclick="saveEditedAccountEntry()"><i class="fa-solid fa-check"></i> Save Changes</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div>
-    <script src="app.js?v=30"></script>
+    <script src="app.js?v=31"></script>
 </body>
 </html>

@@ -54,7 +54,8 @@ const AppDataSchema = new mongoose.Schema({
     coaches: { type: Array, default: [] },
     academyAccounts: { type: Array, default: [] },
     academyAdmins: { type: Array, default: [] },
-    coachSalaries: { type: Array, default: [] }
+    coachSalaries: { type: Array, default: [] },
+    closedAccountMonths: { type: Array, default: [] }
 }, { minimize: false, strict: false });
 
 const AppData = mongoose.model('AppData', AppDataSchema);
@@ -76,6 +77,7 @@ async function getAppData() {
             coaches: [],
             academyAccounts: [],
             coachSalaries: [],
+            closedAccountMonths: [],
             academyAdmins: [
                 { username: 'pmnoushu010', password: 'Aamir@12345$', type: 'super' },
                 { username: 'mufcacademy', password: 'admin@12345', type: 'main' },
@@ -261,6 +263,18 @@ app.post('/api/sync', async (req, res) => {
                     data.players[pIdx] = payload;
                     data.markModified('players');
                 }
+                break;
+            case 'CLOSE_ACADEMY_MONTH':
+                data.closedAccountMonths = data.closedAccountMonths || [];
+                if (!data.closedAccountMonths.some(m => (typeof m === 'string' ? m === payload.month : m.month === payload.month))) {
+                    data.closedAccountMonths.push(payload);
+                    data.markModified('closedAccountMonths');
+                }
+                break;
+            case 'REOPEN_ACADEMY_MONTH':
+                data.closedAccountMonths = data.closedAccountMonths || [];
+                data.closedAccountMonths = data.closedAccountMonths.filter(m => (typeof m === 'string' ? m !== payload.month : m.month !== payload.month));
+                data.markModified('closedAccountMonths');
                 break;
             default:
                 return res.status(400).json({ error: 'Unknown action' });
