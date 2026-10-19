@@ -896,12 +896,51 @@ input[type="number"] {
     color: #fca5a5;
     border: 1px solid rgba(248, 113, 113, 0.35);
     border-radius: 20px;
-    padding: 5px 14px;
+    padding: 4px 12px;
     font-weight: 700;
-    font-size: 0.92rem;
+    font-size: 0.85rem;
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 5px;
+}
+
+.att-student-pill {
+    background: rgba(248, 113, 113, 0.15);
+    color: #f87171;
+    border: 1px solid rgba(248, 113, 113, 0.4);
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-weight: 700;
+    font-size: 0.85rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.att-coach-pill {
+    background: rgba(56, 189, 248, 0.15);
+    color: #38bdf8;
+    border: 1px solid rgba(56, 189, 248, 0.4);
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-weight: 700;
+    font-size: 0.85rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.att-total-pill {
+    background: rgba(255, 255, 255, 0.08);
+    color: #e2e8f0;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-weight: 700;
+    font-size: 0.85rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
 }
 
 .att-students-chips {
@@ -914,8 +953,22 @@ input[type="number"] {
 }
 
 .att-student-chip {
-    background: rgba(56, 189, 248, 0.1);
+    background: rgba(248, 113, 113, 0.12);
+    color: #fca5a5;
+    border: 1px solid rgba(248, 113, 113, 0.25);
+    border-radius: 6px;
+    padding: 2px 8px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.att-coach-chip {
+    background: rgba(56, 189, 248, 0.15);
     color: #7dd3fc;
+    border: 1px solid rgba(56, 189, 248, 0.35);
     border-radius: 6px;
     padding: 2px 8px;
     font-size: 0.75rem;

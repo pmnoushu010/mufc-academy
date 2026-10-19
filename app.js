@@ -4363,19 +4363,73 @@ function renderAcademyDashboard() {
 
     const netProfit = totalIncome - totalExpense;
 
-    // 2. Calculate Attendance for Selected Month
-    const dateStats = {};
-    let monthPresentCount = 0;
-    const activeStudentIds = new Set(academyStudents.map(s => String(s.id)));
+    // 2. Calculate Attendance for Selected Month (Separated for Students and Coaches)
+    const allCoachesList = typeof getAllCoaches === 'function' ? getAllCoaches() : [];
+    const coachIdSet = new Set();
+    allCoachesList.forEach(c => {
+        if (c.id) coachIdSet.add(String(c.id).trim().toLowerCase());
+        if (c.mobile) coachIdSet.add(String(c.mobile).trim().toLowerCase());
+    });
+    (academyStudents || []).forEach(s => {
+        if (s.role === 'coach') {
+            if (s.id) coachIdSet.add(String(s.id).trim().toLowerCase());
+            if (s.contact) coachIdSet.add(String(s.contact).trim().toLowerCase());
+            if (s.mobile) coachIdSet.add(String(s.mobile).trim().toLowerCase());
+        }
+    });
+
+    const isCoachAttendanceRecord = (a) => {
+        if (a.role === 'coach') return true;
+        const sid = String(a.studentId || '').trim().toLowerCase();
+        return coachIdSet.has(sid);
+    };
+
+    const activeStudentIds = new Set(
+        academyStudents
+            .filter(s => s.role !== 'coach' && !coachIdSet.has(String(s.id).trim().toLowerCase()))
+            .map(s => String(s.id).trim().toLowerCase())
+    );
+
+    const studentDateStats = {};
+    const coachDateStats = {};
+    const dateStudentNames = {};
+    const dateCoachNames = {};
+    let monthStudentPresentCount = 0;
+    let monthCoachPresentCount = 0;
+    const allAttDatesSet = new Set();
+
     academyAttendance.forEach(a => {
-        if(a.status === 'Present' && a.date && a.date.startsWith(monthStr)) {
-            if (activeStudentIds.has(String(a.studentId))) {
-                dateStats[a.date] = (dateStats[a.date] || 0) + 1;
-                monthPresentCount++;
+        if (a.status === 'Present' && a.date && a.date.startsWith(monthStr)) {
+            const sid = String(a.studentId || '').trim();
+            const sidLower = sid.toLowerCase();
+
+            if (isCoachAttendanceRecord(a)) {
+                allAttDatesSet.add(a.date);
+                coachDateStats[a.date] = (coachDateStats[a.date] || 0) + 1;
+                monthCoachPresentCount++;
+                if (!dateCoachNames[a.date]) dateCoachNames[a.date] = [];
+                const coachObj = allCoachesList.find(c => 
+                    String(c.id).trim().toLowerCase() === sidLower || 
+                    String(c.mobile || '').trim().toLowerCase() === sidLower
+                ) || (academyStudents || []).find(s => 
+                    String(s.id).trim().toLowerCase() === sidLower ||
+                    String(s.contact || '').trim().toLowerCase() === sidLower ||
+                    String(s.mobile || '').trim().toLowerCase() === sidLower
+                );
+                dateCoachNames[a.date].push(coachObj ? coachObj.name : (a.name || sid));
+            } else if (activeStudentIds.has(sidLower)) {
+                allAttDatesSet.add(a.date);
+                studentDateStats[a.date] = (studentDateStats[a.date] || 0) + 1;
+                monthStudentPresentCount++;
+                if (!dateStudentNames[a.date]) dateStudentNames[a.date] = [];
+                const studentObj = (academyStudents || []).find(s => String(s.id).trim().toLowerCase() === sidLower);
+                dateStudentNames[a.date].push(studentObj ? studentObj.name : (a.name || sid));
             }
         }
     });
-    let attDates = Object.keys(dateStats).sort();
+
+    const monthTotalPresentCount = monthStudentPresentCount + monthCoachPresentCount;
+    let attDates = Array.from(allAttDatesSet).sort();
 
     // 3. Update Monthly KPI Stat Cards
     const elIncome = document.getElementById('dash-stat-income');
@@ -4392,7 +4446,16 @@ function renderAcademyDashboard() {
     }
 
     const elAtt = document.getElementById('dash-stat-attendance');
-    if (elAtt) elAtt.innerText = `${monthPresentCount} Check-ins`;
+    if (elAtt) {
+        elAtt.innerHTML = `
+            <div style="display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;">
+                <span style="font-size: 1.25rem; font-weight: 700; color: #f87171;">${monthStudentPresentCount} <span style="font-size: 0.72rem; font-weight: 500; color: #94a3b8;">Students</span></span>
+                <span style="font-size: 0.95rem; color: #64748b;">+</span>
+                <span style="font-size: 1.25rem; font-weight: 700; color: #38bdf8;">${monthCoachPresentCount} <span style="font-size: 0.72rem; font-weight: 500; color: #94a3b8;">Coaches</span></span>
+            </div>
+            <div style="font-size: 0.74rem; color: #94a3b8; margin-top: 3px; font-weight: 500;">Total: ${monthTotalPresentCount} Check-ins</div>
+        `;
+    }
 
     // 4. Render P&L Donut Chart for Selected Month
     const hasData = (totalIncome > 0 || totalExpense > 0);
@@ -4647,12 +4710,14 @@ function renderAcademyDashboard() {
     renderDashboardAgeStudents();
 
 
-    // 6. Attendance History (Bar chart for Selected Month with on-bar text count)
+    // 6. Attendance History (Grouped Bar chart: Students in coral red, Coaches in sky blue)
     let attLabels = [];
-    let attData = [];
+    let attDataStudents = [];
+    let attDataCoaches = [];
     if (attDates.length === 0) {
         attLabels = [`No Sessions in ${monthShortName}`];
-        attData = [0];
+        attDataStudents = [0];
+        attDataCoaches = [0];
     } else {
         attLabels = attDates.map(d => {
             const parts = d.split('-');
@@ -4663,11 +4728,12 @@ function renderAcademyDashboard() {
             }
             return d;
         });
-        attData = attDates.map(d => dateStats[d]);
+        attDataStudents = attDates.map(d => studentDateStats[d] || 0);
+        attDataCoaches = attDates.map(d => coachDateStats[d] || 0);
     }
     
-    const maxAtt = Math.max(...attData, 0);
-    const suggestedMaxY = Math.max(5, maxAtt + 2);
+    const maxAtt = Math.max(...attDataStudents, ...attDataCoaches, 0);
+    const suggestedMaxY = Math.max(8, Math.ceil((maxAtt + 8) / 5) * 5);
 
     // Custom plugin to display the exact text count directly on top of each bar
     const attendanceBarTextCountPlugin = {
@@ -4678,36 +4744,40 @@ function renderAcademyDashboard() {
             chart.data.datasets.forEach((dataset, datasetIndex) => {
                 const meta = chart.getDatasetMeta(datasetIndex);
                 if (!meta || !meta.data) return;
+                const isCoachDataset = (dataset.label === 'Coaches');
+                const borderColor = isCoachDataset ? '#38bdf8' : '#f87171';
+                const textColor = isCoachDataset ? '#7dd3fc' : '#fca5a5';
+                const typeLabel = isCoachDataset ? 'Coaches' : 'Students';
                 
                 meta.data.forEach((bar, index) => {
                     const count = dataset.data[index];
-                    if (count !== undefined && count !== null) {
+                    if (count > 0) {
                         ctx.save();
-                        const text = `${count} Present`;
-                        ctx.font = "bold 13px 'Outfit', sans-serif";
+                        const text = `${count} ${typeLabel}`;
+                        ctx.font = "bold 11px 'Outfit', sans-serif";
                         const textWidth = ctx.measureText(text).width;
-                        const pillW = textWidth + 18;
-                        const pillH = 24;
+                        const pillW = textWidth + 14;
+                        const pillH = 22;
                         const pillX = bar.x - pillW / 2;
-                        const pillY = Math.max(8, bar.y - pillH - 6);
+                        const pillY = Math.max(6, bar.y - pillH - 5);
 
                         // Pill background
                         ctx.fillStyle = '#0f172a';
                         ctx.beginPath();
                         if (ctx.roundRect) {
-                            ctx.roundRect(pillX, pillY, pillW, pillH, 6);
+                            ctx.roundRect(pillX, pillY, pillW, pillH, 5);
                         } else {
                             ctx.rect(pillX, pillY, pillW, pillH);
                         }
                         ctx.fill();
 
-                        // Pill light red border
-                        ctx.strokeStyle = '#f87171';
+                        // Pill colored border
+                        ctx.strokeStyle = borderColor;
                         ctx.lineWidth = 1.5;
                         ctx.stroke();
 
                         // Count text
-                        ctx.fillStyle = '#fca5a5';
+                        ctx.fillStyle = textColor;
                         ctx.textAlign = 'center';
                         ctx.textBaseline = 'middle';
                         ctx.fillText(text, bar.x, pillY + pillH / 2);
@@ -4724,17 +4794,30 @@ function renderAcademyDashboard() {
             type: 'bar',
             data: {
                 labels: attLabels,
-                datasets: [{
-                    label: 'Total Present',
-                    data: attData,
-                    backgroundColor: '#f87171',
-                    hoverBackgroundColor: '#ef4444',
-                    borderRadius: 8,
-                    borderSkipped: false,
-                    maxBarThickness: 50,
-                    barPercentage: 0.5,
-                    categoryPercentage: 0.5
-                }]
+                datasets: [
+                    {
+                        label: 'Students',
+                        data: attDataStudents,
+                        backgroundColor: '#f87171',
+                        hoverBackgroundColor: '#ef4444',
+                        borderRadius: 6,
+                        borderSkipped: false,
+                        maxBarThickness: 42,
+                        barPercentage: 0.75,
+                        categoryPercentage: 0.6
+                    },
+                    {
+                        label: 'Coaches',
+                        data: attDataCoaches,
+                        backgroundColor: '#38bdf8',
+                        hoverBackgroundColor: '#0284c7',
+                        borderRadius: 6,
+                        borderSkipped: false,
+                        maxBarThickness: 42,
+                        barPercentage: 0.75,
+                        categoryPercentage: 0.6
+                    }
+                ]
             },
             options: {
                 responsive: true,
@@ -4751,29 +4834,48 @@ function renderAcademyDashboard() {
                     y: { 
                         beginAtZero: true, 
                         suggestedMax: suggestedMaxY,
-                        ticks: { color: '#9ca3af', stepSize: 1, precision: 0 },
+                        ticks: { color: '#9ca3af', stepSize: 5, precision: 0 },
                         grid: { color: 'rgba(255, 255, 255, 0.08)' }
                     },
                     x: { 
                         ticks: { 
                             color: '#ffffff', 
-                            font: { size: 12.5, weight: '600', family: "'Outfit', sans-serif" } 
+                            font: { size: 12, weight: '600', family: "'Outfit', sans-serif" } 
                         },
                         grid: { display: false }
                     }
                 },
                 plugins: { 
-                    legend: { display: false },
+                    legend: { 
+                        display: true,
+                        position: 'top',
+                        align: 'end',
+                        labels: {
+                            color: '#e2e8f0',
+                            font: { size: 12, family: "'Outfit', sans-serif", weight: '600' },
+                            padding: 14,
+                            usePointStyle: true,
+                            pointStyle: 'circle',
+                            boxWidth: 8
+                        }
+                    },
                     tooltip: {
                         backgroundColor: '#0f172a',
                         titleColor: '#ffffff',
-                        bodyColor: '#fca5a5',
-                        borderColor: '#f87171',
+                        borderColor: 'rgba(255, 255, 255, 0.15)',
                         borderWidth: 1,
                         padding: 10,
                         callbacks: {
                             label: function(context) {
-                                return ` Present: ${context.parsed.y || context.parsed || 0} students`;
+                                const val = context.parsed.y || 0;
+                                return ` ${context.dataset.label}: ${val} present`;
+                            },
+                            footer: function(tooltipItems) {
+                                let total = 0;
+                                tooltipItems.forEach(item => {
+                                    total += (item.parsed.y || 0);
+                                });
+                                return ` Combined Total: ${total} present`;
                             }
                         }
                     }
@@ -4794,12 +4896,15 @@ function renderAcademyDashboard() {
                 </div>
             `;
         } else {
-            const totalStudents = academyStudents.filter(s => s.role !== 'coach').length;
+            const totalStudents = activeStudentIds.size;
+            const totalCoaches = allCoachesList.length;
             let rowsHtml = '';
             
             attDates.forEach(d => {
-                const count = dateStats[d] || 0;
-                const pct = totalStudents > 0 ? Math.round((count / totalStudents) * 100) : 0;
+                const sCount = studentDateStats[d] || 0;
+                const cCount = coachDateStats[d] || 0;
+                const totCount = sCount + cCount;
+                const pct = totalStudents > 0 ? Math.round((sCount / totalStudents) * 100) : 0;
                 
                 const parts = d.split('-');
                 let dateDisplay = d;
@@ -4810,21 +4915,29 @@ function renderAcademyDashboard() {
                     dateDisplay = `${parts[2]} ${dObj.toLocaleDateString('en-US', { month: 'short' })} ${parts[0]}`;
                 }
 
-                // Get names of present students
-                const presentNames = academyAttendance
-                    .filter(a => a.date === d && a.status === 'Present' && activeStudentIds.has(String(a.studentId)))
-                    .map(a => {
-                        const st = academyStudents.find(s => String(s.id) === String(a.studentId));
-                        return st ? st.name : null;
-                    })
-                    .filter(Boolean);
+                const sNames = dateStudentNames[d] || [];
+                const cNames = dateCoachNames[d] || [];
+
+                let coachChipsHtml = '';
+                if (cNames.length > 0) {
+                    coachChipsHtml = `
+                        <div class="att-students-chips" style="margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center;">
+                            <span style="font-size: 0.76rem; color: #38bdf8; font-weight: 600; margin-right: 4px;">
+                                <i class="fa-solid fa-user-tie"></i> Coaches (${cNames.length}):
+                            </span>
+                            ${cNames.map(name => `<span class="att-coach-chip"><i class="fa-solid fa-user-tie" style="font-size: 0.7rem;"></i> ${escapeHtml(name)}</span>`).join('')}
+                        </div>
+                    `;
+                }
 
                 let studentsChipsHtml = '';
-                if (presentNames.length > 0) {
+                if (sNames.length > 0) {
                     studentsChipsHtml = `
-                        <div class="att-students-chips">
-                            <span style="font-size: 0.75rem; color: var(--text-muted); align-self: center; margin-right: 4px;">Present:</span>
-                            ${presentNames.map(name => `<span class="att-student-chip"><i class="fa-solid fa-user-check"></i> ${name}</span>`).join('')}
+                        <div class="att-students-chips" style="margin-top: 6px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center;">
+                            <span style="font-size: 0.76rem; color: #f87171; font-weight: 600; margin-right: 4px;">
+                                <i class="fa-solid fa-graduation-cap"></i> Students (${sNames.length}):
+                            </span>
+                            ${sNames.map(name => `<span class="att-student-chip"><i class="fa-solid fa-user-check" style="font-size: 0.7rem;"></i> ${escapeHtml(name)}</span>`).join('')}
                         </div>
                     `;
                 }
@@ -4839,15 +4952,24 @@ function renderAcademyDashboard() {
                                     </div>
                                     <div>
                                         <div class="att-date-title">${dayDisplay}, ${dateDisplay}</div>
-                                        <div class="att-date-sub">${count} of ${totalStudents} students attended (${pct}%)</div>
+                                        <div class="att-date-sub">
+                                            ${sCount} of ${totalStudents} students attended (${pct}%) · ${cCount} of ${totalCoaches} coaches present
+                                        </div>
                                     </div>
                                 </div>
-                                <div class="att-date-right">
-                                    <span class="att-count-pill">
-                                        <i class="fa-solid fa-users"></i> ${count} Present
+                                <div class="att-date-right" style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                                    <span class="att-student-pill">
+                                        <i class="fa-solid fa-graduation-cap"></i> ${sCount} Students
+                                    </span>
+                                    <span class="att-coach-pill">
+                                        <i class="fa-solid fa-user-tie"></i> ${cCount} Coaches
+                                    </span>
+                                    <span class="att-total-pill">
+                                        <i class="fa-solid fa-users"></i> ${totCount} Total
                                     </span>
                                 </div>
                             </div>
+                            ${coachChipsHtml}
                             ${studentsChipsHtml}
                         </div>
                     </div>
@@ -4855,9 +4977,15 @@ function renderAcademyDashboard() {
             });
 
             breakdownEl.innerHTML = `
-                <div class="dashboard-att-breakdown-title">
+                <div class="dashboard-att-breakdown-title" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
                     <span><i class="fa-solid fa-list-check" style="color: #f87171; margin-right: 6px;"></i> Date-Wise Session Breakdown (${attDates.length} session${attDates.length > 1 ? 's' : ''})</span>
-                    <span style="font-size: 0.8rem; color: var(--text-muted);">Total Present: ${monthPresentCount}</span>
+                    <span style="font-size: 0.82rem; color: var(--text-muted); display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                        <span style="color: #f87171; font-weight: 600;"><i class="fa-solid fa-graduation-cap"></i> ${monthStudentPresentCount} Students</span>
+                        <span style="color: #64748b;">|</span>
+                        <span style="color: #38bdf8; font-weight: 600;"><i class="fa-solid fa-user-tie"></i> ${monthCoachPresentCount} Coaches</span>
+                        <span style="color: #64748b;">|</span>
+                        <span style="color: #e2e8f0; font-weight: 600;">Total: ${monthTotalPresentCount}</span>
+                    </span>
                 </div>
                 <div class="dashboard-att-date-cards">
                     ${rowsHtml}
