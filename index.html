@@ -517,11 +517,11 @@
                     </div>
                     
                     <div class="activity-card" style="margin-bottom: 20px; padding: 18px 24px; display: flex;">
-                        <div class="activity-stat" style="text-align: center; flex: 1; border-right: 1px solid rgba(255,255,255,0.1);">
+                        <div class="activity-stat" id="academy-strength-card" style="text-align: center; flex: 1; border-right: 1px solid rgba(255,255,255,0.1);">
                             <h3 class="good-stat" id="academy-total-strength" style="font-size: 1.8rem; font-weight: 700;">0 / 0</h3>
                             <p style="font-size: 0.95rem; margin-top: 4px;">Total Present Today</p>
                         </div>
-                        <div class="activity-stat" style="text-align: center; flex: 1;">
+                        <div class="activity-stat" id="academy-collected-today-card" style="text-align: center; flex: 1;">
                             <h3 style="color: #3b82f6; font-size: 1.8rem; font-weight: 700; margin: 0 0 5px 0;"><span id="academy-today-collected">0</span> <span style="font-size: 1.05rem; color: var(--text-muted);">SAR</span></h3>
                             <p style="font-size: 0.95rem; margin-top: 4px;">Collected Today</p>
                         </div>
@@ -880,6 +880,7 @@
                             <div style="flex: 1; min-width: 120px;">
                                 <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 4px;">User Type</label>
                                 <select id="admin-input-type" class="form-select" style="width: 100%; padding: 10px; border-radius: 8px; background: rgba(15, 23, 42, 0.8); color: white; border: 1px solid #374151;">
+                                    <option value="attendance">Coach (Attendance Only)</option>
                                     <option value="normal">Normal</option>
                                     <option value="main">Main</option>
                                 </select>
@@ -1390,6 +1391,6 @@
         </div>
 
     </div>
-    <script src="app.js?v=32"></script>
+    <script src="app.js?v=33"></script>
 </body>
 </html>

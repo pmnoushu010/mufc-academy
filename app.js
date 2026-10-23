@@ -404,14 +404,18 @@ function performLogin(role, user) {
         renderAdminAttendance();
         renderAdminMessages();
     } else if(role === 'academyAdmin') {
+        const isAttendanceOnly = (user && (user.type === 'attendance' || user.type === 'coach'));
         document.querySelector('.profile-pic').style.backgroundImage = "none";
-        document.getElementById('header-title').innerText = "Academy Portal";
+        document.getElementById('header-title').innerText = isAttendanceOnly ? "Coach Portal" : "Academy Portal";
         document.getElementById('admin-nav').style.display = 'none';
         document.getElementById('player-nav').style.display = 'none';
         document.getElementById('academy-nav').style.display = 'flex';
         document.querySelectorAll('#academy-nav .nav-item').forEach(item => {
             const onclick = item.getAttribute('onclick') || '';
-            if (onclick.includes('academy-users')) {
+            if (isAttendanceOnly) {
+                // Coach / Attendance Only: STRICTLY show Student Attendance, hide everything else
+                item.style.display = (onclick.includes('academy-attendance') && !onclick.includes('academy-coach-attendance')) ? 'flex' : 'none';
+            } else if (onclick.includes('academy-users')) {
                 // Access only for super admin (rolled back from main user and normal user)
                 item.style.display = (user && user.type === 'super') ? 'flex' : 'none';
             } else if (onclick.includes('academy-dashboard')) {
@@ -430,8 +434,13 @@ function performLogin(role, user) {
             }
         });
         
-        switchView('academy-admin');
-        renderAcademyStudents();
+        if (isAttendanceOnly) {
+            switchView('academy-attendance');
+            renderAcademyAttendance();
+        } else {
+            switchView('academy-admin');
+            renderAcademyStudents();
+        }
     } else if(role === 'coach') {
         document.querySelector('.profile-pic').style.backgroundImage = currentUser.pic ? `url('${currentUser.pic}')` : "none";
         document.getElementById('header-title').innerText = "Coach Portal";
@@ -439,9 +448,10 @@ function performLogin(role, user) {
         document.getElementById('player-nav').style.display = 'none';
         document.getElementById('academy-nav').style.display = 'flex';
         
-        // Hide other academy nav items
+        // Hide other academy nav items - ONLY show Student Attendance
         document.querySelectorAll('#academy-nav .nav-item').forEach(item => {
-            if (item.innerText.includes('Attendance')) {
+            const onclick = item.getAttribute('onclick') || '';
+            if (onclick.includes('academy-attendance') && !onclick.includes('academy-coach-attendance')) {
                 item.style.display = 'flex';
             } else {
                 item.style.display = 'none';
@@ -476,12 +486,19 @@ function logout() {
 // Navigation
 function switchView(viewId, event) {
     if(event) event.preventDefault();
+
+    // Restriction for Coach / Attendance Only users: strictly lock to academy-attendance
+    const isAttendanceOnly = (currentRole === 'coach') || (currentUser && (currentUser.type === 'attendance' || currentUser.type === 'coach'));
+    if (isAttendanceOnly && viewId !== 'academy-attendance') {
+        viewId = 'academy-attendance';
+    }
+
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     const target = document.getElementById(`view-${viewId}`);
     if(target) target.classList.add('active');
     
     // Update nav icons
-    const navId = currentRole === 'admin' ? 'admin-nav' : (currentRole === 'academyAdmin' ? 'academy-nav' : 'player-nav');
+    const navId = currentRole === 'admin' ? 'admin-nav' : ((currentRole === 'academyAdmin' || currentRole === 'coach') ? 'academy-nav' : 'player-nav');
     document.querySelectorAll(`#${navId} .nav-item`).forEach(n => n.classList.remove('active'));
     if(event) {
         event.currentTarget.classList.add('active');
@@ -2402,6 +2419,18 @@ function renderAcademyAttendance() {
     const list = document.getElementById('academy-attendance-list');
     if(!list) return;
     
+    const isAttendanceOnly = (currentRole === 'coach') || (currentUser && (currentUser.type === 'attendance' || currentUser.type === 'coach'));
+    
+    // Toggle collected card visibility
+    const collectedCard = document.getElementById('academy-collected-today-card');
+    const strengthCard = document.getElementById('academy-strength-card');
+    if (collectedCard) {
+        collectedCard.style.display = isAttendanceOnly ? 'none' : 'block';
+    }
+    if (strengthCard) {
+        strengthCard.style.borderRight = isAttendanceOnly ? 'none' : '1px solid rgba(255,255,255,0.1)';
+    }
+
     let dateStr = document.getElementById('academy-attendance-date').value;
     if(!dateStr) {
         const today = new Date().toISOString().split('T')[0];
@@ -2427,8 +2456,10 @@ function renderAcademyAttendance() {
     }).length;
     document.getElementById('academy-total-strength').innerText = `${totalPresentToday} / ${genuineStudents.length}`;
     
-    // Calculate total collected for this specific date
-    updateTodayCollectedBadge();
+    // Calculate total collected for this specific date (only for managers/admins)
+    if (!isAttendanceOnly) {
+        updateTodayCollectedBadge();
+    }
     
     const searchInput = document.getElementById('academy-attendance-search');
     const searchQuery = searchInput ? searchInput.value.toLowerCase() : '';
@@ -2451,13 +2482,29 @@ function renderAcademyAttendance() {
         const payment = getAcademyPaymentForMonth(monthStr, student.id);
         const isPaid = payment && payment.status === 'Paid';
         const hasAttended = academyAttendance.some(a => a.studentId === student.id && a.date.startsWith(monthStr) && a.status === 'Present');
-        const nameColor = hasAttended ? (isPaid ? '#10b981' : '#ef4444') : (student.gender === 'Female' ? '#ec4899' : '#fff');
+        
+        // When attendance only, hide payment indicator colors and paid checkmarks
+        const nameColor = isAttendanceOnly 
+            ? (student.gender === 'Female' ? '#ec4899' : '#fff')
+            : (hasAttended ? (isPaid ? '#10b981' : '#ef4444') : (student.gender === 'Female' ? '#ec4899' : '#fff'));
+        const paidCheckmark = (!isAttendanceOnly && isPaid) ? '<i class="fa-solid fa-circle-check" style="font-size: 0.95rem; color: #10b981; margin-left: 6px;"></i>' : '';
         const amount = payment ? payment.amount || payment.paid || '' : '';
         
         const initial = student.name ? student.name.trim().charAt(0).toUpperCase() : 'S';
         const avatarStyle = student.pic 
             ? `background-image: url('${student.pic}');` 
             : `background: linear-gradient(135deg, #1e3a8a, #2563eb);`;
+
+        const paymentControlsHtml = isAttendanceOnly ? '' : `
+            <div style="width: 1px; height: 30px; background: #374151; margin: 0 5px;"></div>
+            
+            <div style="display: flex; gap: 8px; align-items: center;">
+                <input type="number" id="attendance-fee-${student.id}" value="${amount}" placeholder="SAR" style="width: 90px; padding: 10px; border-radius: 10px; background: rgba(15, 23, 42, 0.8); color: white; border: 1px solid #374151; text-align: center; font-weight: bold; font-size: 0.95rem;" oninput="handleFeeInput(this, '${student.id}', '${monthStr}')">
+                <button id="pay-btn-${student.id}" class="btn-primary" style="padding: 10px 16px; border-radius: 10px; font-size: 0.95rem; font-weight: 600; display: flex; align-items: center; gap: 6px; ${isPaid ? 'background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16,185,129,0.3); opacity: 1;' : (amount > 0 ? 'background: #3b82f6; color: white; border: 1px solid #3b82f6; opacity: 1;' : 'background: #374151; color: #9ca3af; border: 1px solid #374151; opacity: 0.5;')}" onclick="togglePaymentStatusFromAttendance('${student.id}', '${monthStr}')" ${(!isPaid && (!amount || amount <= 0)) || isPaid ? 'disabled' : ''}>
+                    <i class="fa-solid fa-wallet"></i> ${isPaid ? 'Paid' : 'Pay'}
+                </button>
+            </div>
+        `;
 
         const div = document.createElement('div');
         div.className = 'player-card';
@@ -2473,7 +2520,7 @@ function renderAcademyAttendance() {
                     ${student.pic ? '' : initial}
                 </div>
                 <div style="overflow: hidden;">
-                    <h3 style="font-size: 1.25rem; font-weight: 600; color: ${nameColor}; white-space: nowrap; text-overflow: ellipsis; overflow: hidden;">${escapeHtml(student.name)} ${(student.age && student.age !== '-' ? `<span class="player-age-badge" style="margin-left: 6px;">${student.age} Yrs</span>` : '')} ${isPaid ? '<i class="fa-solid fa-circle-check" style="font-size: 0.95rem; color: #10b981; margin-left: 6px;"></i>' : ''}</h3>
+                    <h3 style="font-size: 1.25rem; font-weight: 600; color: ${nameColor}; white-space: nowrap; text-overflow: ellipsis; overflow: hidden;">${escapeHtml(student.name)} ${(student.age && student.age !== '-' ? `<span class="player-age-badge" style="margin-left: 6px;">${student.age} Yrs</span>` : '')} ${paidCheckmark}</h3>
                     <p style="font-size: 0.95rem; color: var(--text-muted); margin-top: 3px;">ID: <strong style="color: #f1f5f9;">${escapeHtml(student.id)}</strong> | Parent: <strong style="color: #f1f5f9;">${escapeHtml(student.fatherName || 'N/A')}</strong></p>
                 </div>
             </div>
@@ -2488,16 +2535,9 @@ function renderAcademyAttendance() {
                     </button>
                 </div>
                 
-                <input type="text" maxlength="25" value="${escapeHtml(student.remarks || '')}" placeholder="Remarks (Max 25)" style="width: 250px; padding: 10px 14px; border-radius: 10px; background: rgba(15, 23, 42, 0.8); color: white; border: 1px solid #374151; font-size: 0.95rem;" onchange="updateAcademyRemark('${student.id}', this.value)">
+                <input type="text" maxlength="25" value="${escapeHtml(student.remarks || '')}" placeholder="Remarks (Max 25)" style="width: ${isAttendanceOnly ? '320px' : '250px'}; padding: 10px 14px; border-radius: 10px; background: rgba(15, 23, 42, 0.8); color: white; border: 1px solid #374151; font-size: 0.95rem;" onchange="updateAcademyRemark('${student.id}', this.value)">
                 
-                <div style="width: 1px; height: 30px; background: #374151; margin: 0 5px;"></div>
-                
-                <div style="display: flex; gap: 8px; align-items: center;">
-                    <input type="number" id="attendance-fee-${student.id}" value="${amount}" placeholder="SAR" style="width: 90px; padding: 10px; border-radius: 10px; background: rgba(15, 23, 42, 0.8); color: white; border: 1px solid #374151; text-align: center; font-weight: bold; font-size: 0.95rem;" oninput="handleFeeInput(this, '${student.id}', '${monthStr}')">
-                    <button id="pay-btn-${student.id}" class="btn-primary" style="padding: 10px 16px; border-radius: 10px; font-size: 0.95rem; font-weight: 600; display: flex; align-items: center; gap: 6px; ${isPaid ? 'background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16,185,129,0.3); opacity: 1;' : (amount > 0 ? 'background: #3b82f6; color: white; border: 1px solid #3b82f6; opacity: 1;' : 'background: #374151; color: #9ca3af; border: 1px solid #374151; opacity: 0.5;')}" onclick="togglePaymentStatusFromAttendance('${student.id}', '${monthStr}')" ${(!isPaid && (!amount || amount <= 0)) || isPaid ? 'disabled' : ''}>
-                        <i class="fa-solid fa-wallet"></i> ${isPaid ? 'Paid' : 'Pay'}
-                    </button>
-                </div>
+                ${paymentControlsHtml}
             </div>
         `;
         list.appendChild(div);
@@ -4477,8 +4517,10 @@ function renderAcademyUsers() {
     
     academyAdmins.forEach(admin => {
         const isSuper = admin.type === 'super';
-        const typeLabel = admin.type === 'super' ? 'Super Admin' : (admin.type === 'main' ? 'Main User' : 'Normal User');
-        const color = admin.type === 'super' ? '#8b5cf6' : (admin.type === 'main' ? '#10b981' : '#38bdf8');
+        const isAttendanceOnly = (admin.type === 'attendance' || admin.type === 'coach');
+        const typeLabel = isSuper ? 'Super Admin' : (admin.type === 'main' ? 'Main User' : (isAttendanceOnly ? 'Coach (Attendance Only)' : 'Normal User'));
+        const color = isSuper ? '#8b5cf6' : (admin.type === 'main' ? '#10b981' : (isAttendanceOnly ? '#f59e0b' : '#38bdf8'));
+        const icon = isSuper ? 'fa-crown' : (isAttendanceOnly ? 'fa-clipboard-user' : 'fa-user');
         
         let actionHtml = '-';
         if (currentUser && currentUser.type === 'super' && !isSuper) {
@@ -4494,12 +4536,12 @@ function renderAcademyUsers() {
         list.innerHTML += `
             <div class="player-card" style="display: flex; align-items: center; padding: 12px 20px; border-radius: 8px; margin-bottom: 8px; background: rgba(15, 23, 42, 0.8); border: 1px solid #374151;">
                 <div style="flex: 2; min-width: 200px; color: #fff; font-weight: bold;">
-                    <i class="fa-solid ${isSuper ? 'fa-crown' : 'fa-user'}" style="color: ${color}; margin-right: 8px;"></i>${escapeHtml(admin.username)}
+                    <i class="fa-solid ${icon}" style="color: ${color}; margin-right: 8px;"></i>${escapeHtml(admin.username)}
                 </div>
                 <div style="flex: 2; min-width: 200px; color: var(--text-muted); font-family: monospace;">
                     ${isSuper ? '••••••••' : escapeHtml(admin.password)}
                 </div>
-                <div style="width: 150px; font-weight: bold; color: ${color};">
+                <div style="width: 190px; font-weight: bold; color: ${color};">
                     ${typeLabel}
                 </div>
                 <div style="width: 80px; text-align: center;">
