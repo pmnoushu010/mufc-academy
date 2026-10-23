@@ -140,6 +140,9 @@
                     <a href="#" class="nav-item" onclick="switchView('academy-attendance', event)">
                         <i class="fa-solid fa-clipboard-check"></i><span>Attendance</span>
                     </a>
+                    <a href="#" class="nav-item" id="nav-categorise-list" onclick="switchView('academy-categorise-list', event)">
+                        <i class="fa-solid fa-layer-group"></i><span>Categorise List</span>
+                    </a>
                     <a href="#" class="nav-item" onclick="switchView('academy-coach-attendance', event)">
                         <i class="fa-solid fa-user-tie"></i><span>Coach Attendance</span>
                     </a>
@@ -533,6 +536,68 @@
                     
                     <div id="academy-attendance-list" class="player-list">
                         <!-- Populated dynamically -->
+                    </div>
+                </section>
+
+                <!-- Categorise List View (Students by Coach) -->
+                <section id="view-academy-categorise-list" class="view">
+                    <div class="view-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 20px;">
+                        <div>
+                            <h2>Categorise List</h2>
+                            <p style="font-size: 0.95rem; color: var(--text-muted); margin-top: 4px;">Students practicing under each coach & batch breakdown</p>
+                        </div>
+                        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                            <input type="date" id="categorise-list-date" class="form-select" style="padding: 10px 14px; width: 160px; font-size: 0.95rem; background: rgba(15, 23, 42, 0.8);" onclick="this.showPicker()" onchange="renderAcademyCategoriseList()">
+                            <select id="categorise-mode-select" class="form-select" style="padding: 10px 14px; font-size: 0.95rem; background: rgba(15, 23, 42, 0.8); color: white; border: 1px solid #374151;" onchange="renderAcademyCategoriseList()">
+                                <option value="daily">Daily Practice by Coach</option>
+                                <option value="all">All Students by Coach</option>
+                            </select>
+                            <button class="btn-excel" onclick="exportCategoriseListToExcel()" title="Export Categorised List to Excel" style="padding: 10px 16px; font-size: 0.92rem;">
+                                <i class="fa-solid fa-file-excel"></i> <span>Export to Excel</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Summary KPI Stats -->
+                    <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 20px;">
+                        <div class="stat-card" style="padding: 16px; border-color: #3b82f6;">
+                            <i class="fa-solid fa-user-tie" style="color: #3b82f6; background: rgba(59, 130, 246, 0.12); padding: 12px; font-size: 1.3rem;"></i>
+                            <div class="stat-info">
+                                <h3 id="cat-stat-total-coaches" style="font-size: 1.4rem; color: #fff;">0</h3>
+                                <p style="font-size: 0.85rem;">Active Coaches</p>
+                            </div>
+                        </div>
+                        <div class="stat-card" style="padding: 16px; border-color: #10b981;">
+                            <i class="fa-solid fa-users" style="color: #10b981; background: rgba(16, 185, 129, 0.12); padding: 12px; font-size: 1.3rem;"></i>
+                            <div class="stat-info">
+                                <h3 id="cat-stat-total-students" style="font-size: 1.4rem; color: #10b981;">0</h3>
+                                <p style="font-size: 0.85rem;">Total Students</p>
+                            </div>
+                        </div>
+                        <div class="stat-card" style="padding: 16px; border-color: #38bdf8;">
+                            <i class="fa-solid fa-clipboard-check" style="color: #38bdf8; background: rgba(56, 189, 248, 0.12); padding: 12px; font-size: 1.3rem;"></i>
+                            <div class="stat-info">
+                                <h3 id="cat-stat-present" style="font-size: 1.4rem; color: #38bdf8;">0</h3>
+                                <p style="font-size: 0.85rem;">Present Today</p>
+                            </div>
+                        </div>
+                        <div class="stat-card" style="padding: 16px; border-color: #f59e0b;">
+                            <i class="fa-solid fa-chart-pie" style="color: #f59e0b; background: rgba(245, 158, 11, 0.12); padding: 12px; font-size: 1.3rem;"></i>
+                            <div class="stat-info">
+                                <h3 id="cat-stat-avg" style="font-size: 1.4rem; color: #f59e0b;">0</h3>
+                                <p style="font-size: 0.85rem;">Avg / Coach</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Search Filter -->
+                    <div style="margin-bottom: 20px;">
+                        <input type="text" id="categorise-list-search" placeholder="Search student name or coach..." class="form-input" style="width: 100%; padding: 14px 18px; border-radius: 12px; background: var(--bg-card); color: #fff; border: 1px solid #374151; font-size: 1.05rem;" onkeyup="renderAcademyCategoriseList()">
+                    </div>
+
+                    <!-- Coach-wise Student Containers -->
+                    <div id="academy-categorise-container">
+                        <!-- Populated dynamically with coach blocks and tables -->
                     </div>
                 </section>
 
@@ -1391,6 +1456,6 @@
         </div>
 
     </div>
-    <script src="app.js?v=33"></script>
+    <script src="app.js?v=36"></script>
 </body>
 </html>

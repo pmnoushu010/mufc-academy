@@ -178,6 +178,7 @@ setInterval(async () => {
                     else if(viewId === 'academy-reports') renderAcademyReports();
                     else if(viewId === 'academy-accounts') renderAcademyAccounts();
                     else if(viewId === 'academy-users') renderAcademyUsers();
+                    else if(viewId === 'academy-categorise-list') renderAcademyCategoriseList();
                 }
                 
                 // Also update chat if open
@@ -353,9 +354,13 @@ function handleLogin() {
     }
 
     // Coach check
-    const coach = coaches.find(c => c.mobile === loginId && c.password === loginPass);
+    const coach = coaches.find(c => (c.mobile === loginId || String(c.id) === loginId || (c.name && c.name.toLowerCase() === loginId.toLowerCase())) && c.password === loginPass);
     if(coach) {
         return performLogin('coach', coach);
+    }
+    const academyCoach = (academyStudents || []).find(s => s.role === 'coach' && (String(s.id) === loginId || s.contact === loginId || s.mobile === loginId || (s.name && s.name.toLowerCase() === loginId.toLowerCase())) && s.password && s.password === loginPass);
+    if(academyCoach) {
+        return performLogin('coach', academyCoach);
     }
 
     // Player check
@@ -413,8 +418,12 @@ function performLogin(role, user) {
         document.querySelectorAll('#academy-nav .nav-item').forEach(item => {
             const onclick = item.getAttribute('onclick') || '';
             if (isAttendanceOnly) {
-                // Coach / Attendance Only: STRICTLY show Student Attendance, hide everything else
-                item.style.display = (onclick.includes('academy-attendance') && !onclick.includes('academy-coach-attendance')) ? 'flex' : 'none';
+                // Coach / Attendance Only: strictly show Student Attendance AND Categorise List
+                const isAllowed = (onclick.includes('academy-attendance') && !onclick.includes('academy-coach-attendance')) ||
+                                  onclick.includes('academy-categorise-list');
+                item.style.display = isAllowed ? 'flex' : 'none';
+            } else if (onclick.includes('academy-categorise-list')) {
+                item.style.display = 'flex';
             } else if (onclick.includes('academy-users')) {
                 // Access only for super admin (rolled back from main user and normal user)
                 item.style.display = (user && user.type === 'super') ? 'flex' : 'none';
@@ -448,10 +457,12 @@ function performLogin(role, user) {
         document.getElementById('player-nav').style.display = 'none';
         document.getElementById('academy-nav').style.display = 'flex';
         
-        // Hide other academy nav items - ONLY show Student Attendance
+        // Hide other academy nav items - ONLY show Student Attendance & Categorise List
         document.querySelectorAll('#academy-nav .nav-item').forEach(item => {
             const onclick = item.getAttribute('onclick') || '';
-            if (onclick.includes('academy-attendance') && !onclick.includes('academy-coach-attendance')) {
+            const isAllowed = (onclick.includes('academy-attendance') && !onclick.includes('academy-coach-attendance')) ||
+                              onclick.includes('academy-categorise-list');
+            if (isAllowed) {
                 item.style.display = 'flex';
             } else {
                 item.style.display = 'none';
@@ -487,9 +498,9 @@ function logout() {
 function switchView(viewId, event) {
     if(event) event.preventDefault();
 
-    // Restriction for Coach / Attendance Only users: strictly lock to academy-attendance
+    // Restriction for Coach / Attendance Only users: allow academy-attendance and academy-categorise-list
     const isAttendanceOnly = (currentRole === 'coach') || (currentUser && (currentUser.type === 'attendance' || currentUser.type === 'coach'));
-    if (isAttendanceOnly && viewId !== 'academy-attendance') {
+    if (isAttendanceOnly && viewId !== 'academy-attendance' && viewId !== 'academy-categorise-list') {
         viewId = 'academy-attendance';
     }
 
@@ -544,6 +555,8 @@ function switchView(viewId, event) {
         renderPnL();
     } else if(viewId === 'academy-approvals') {
         renderAcademyApprovals();
+    } else if(viewId === 'academy-categorise-list') {
+        renderAcademyCategoriseList();
     }
 }
 
@@ -3332,14 +3345,623 @@ function exportCoachSalariesToExcel() {
 }
 
 function markAcademyAttendance(studentId, dateStr, status) {
+    let coachName = 'Admin';
+    let coachId = 'admin';
+    
+    if (currentRole === 'coach' && currentUser) {
+        coachName = currentUser.name || currentUser.mobile || 'Coach';
+        coachId = currentUser.id || currentUser.mobile || 'coach';
+    } else if (currentUser && (currentUser.type === 'attendance' || currentUser.type === 'coach')) {
+        coachName = currentUser.id || currentUser.username || 'Coach';
+        coachId = currentUser.id || currentUser.username || 'coach';
+    } else if (currentUser && currentUser.id) {
+        coachName = currentUser.id;
+        coachId = currentUser.id;
+    }
+
     let record = academyAttendance.find(a => a.date === dateStr && a.studentId === studentId);
     if(record) {
         record.status = status;
+        record.markedBy = coachName;
+        record.coachId = coachId;
+        record.markedAt = new Date().toISOString();
     } else {
-        academyAttendance.push({ date: dateStr, studentId: studentId, status: status });
+        academyAttendance.push({ 
+            date: dateStr, 
+            studentId: studentId, 
+            status: status,
+            markedBy: coachName,
+            coachId: coachId,
+            markedAt: new Date().toISOString()
+        });
     }
+    
+    // Also record practicing coach on the student object
+    const student = (academyStudents || []).find(s => s.id === studentId);
+    if (student) {
+        student.assignedCoach = coachName;
+    }
+
     saveData();
     renderAcademyAttendance();
+    
+    const catView = document.getElementById('view-academy-categorise-list');
+    if (catView && catView.classList.contains('active')) {
+        renderAcademyCategoriseList();
+    }
+}
+
+// ================= ACADEMY CATEGORISE LIST LOGIC =================
+
+function getAllAcademyCoachProfiles() {
+    const list = [];
+    const seen = new Set();
+    
+    // 1. Coaches from academyAdmins (type === 'attendance' or type === 'coach')
+    (academyAdmins || []).forEach(a => {
+        if (a && (a.type === 'attendance' || a.type === 'coach')) {
+            const key = a.username.trim().toLowerCase();
+            if (!seen.has(key)) {
+                seen.add(key);
+                list.push({
+                    id: a.username,
+                    name: a.username,
+                    mobile: a.username,
+                    type: 'attendance_user'
+                });
+            }
+        }
+    });
+
+    // 2. Coaches from coaches array and academyStudents (role === 'coach')
+    if (typeof getAllCoaches === 'function') {
+        getAllCoaches().forEach(c => {
+            const key = String(c.name || c.id || c.mobile).trim().toLowerCase();
+            if (!seen.has(key)) {
+                seen.add(key);
+                list.push(c);
+            }
+        });
+    }
+
+    // 3. Any coach names found in student.assignedCoach or academyAttendance.markedBy
+    (academyStudents || []).forEach(s => {
+        if (s && s.assignedCoach && s.assignedCoach !== 'Admin' && s.assignedCoach !== 'Unassigned') {
+            const key = s.assignedCoach.trim().toLowerCase();
+            if (!seen.has(key)) {
+                seen.add(key);
+                list.push({
+                    id: s.assignedCoach,
+                    name: s.assignedCoach,
+                    mobile: '',
+                    type: 'assigned'
+                });
+            }
+        }
+    });
+
+    (academyAttendance || []).forEach(a => {
+        if (a && a.markedBy && a.markedBy !== 'Admin' && a.markedBy !== 'Unassigned') {
+            const key = a.markedBy.trim().toLowerCase();
+            if (!seen.has(key)) {
+                seen.add(key);
+                list.push({
+                    id: a.markedBy,
+                    name: a.markedBy,
+                    mobile: '',
+                    type: 'marked_by'
+                });
+            }
+        }
+    });
+
+    return list;
+}
+
+function renderAcademyCategoriseList() {
+    const container = document.getElementById('academy-categorise-container');
+    if (!container) return;
+
+    let dateInput = document.getElementById('categorise-list-date');
+    if (dateInput && !dateInput.value) {
+        dateInput.value = new Date().toISOString().split('T')[0];
+    }
+    const selectedDate = dateInput ? dateInput.value : new Date().toISOString().split('T')[0];
+    
+    const modeSelect = document.getElementById('categorise-mode-select');
+    const mode = modeSelect ? modeSelect.value : 'daily'; // 'daily' or 'all'
+
+    const searchInput = document.getElementById('categorise-list-search');
+    const searchQuery = searchInput ? searchInput.value.trim().toLowerCase() : '';
+
+    const genuineStudents = (academyStudents || []).filter(s => s.role !== 'coach');
+
+    // Get all known coach profiles
+    const coachProfiles = getAllAcademyCoachProfiles();
+
+    // Map: coachName -> Array of student entries
+    const coachMap = new Map();
+
+    // Initialize all known coaches in map
+    coachProfiles.forEach(c => {
+        coachMap.set(c.name, {
+            profile: c,
+            students: []
+        });
+    });
+
+    // Special category for unassigned / marked by admin / other
+    const unassignedGroup = [];
+    const adminGroup = [];
+
+    let totalPracticingCount = 0;
+    let presentCountTotal = 0;
+
+    genuineStudents.forEach(student => {
+        // Search filter
+        if (searchQuery) {
+            const matchName = (student.name || '').toLowerCase().includes(searchQuery);
+            const matchParent = (student.fatherName || '').toLowerCase().includes(searchQuery);
+            const matchId = String(student.id || '').toLowerCase().includes(searchQuery);
+            const matchCoach = (student.assignedCoach || '').toLowerCase().includes(searchQuery);
+            if (!matchName && !matchParent && !matchId && !matchCoach) {
+                return;
+            }
+        }
+
+        const attRecord = getAcademyAttendanceForDate(selectedDate, student.id);
+        const isPresent = attRecord && attRecord.status === 'Present';
+        const isAbsent = attRecord && attRecord.status === 'Absent';
+        
+        let targetCoachName = null;
+
+        if (mode === 'daily') {
+            // In daily mode: group strictly by who marked attendance on that date
+            if (attRecord && attRecord.markedBy && attRecord.markedBy !== 'Admin') {
+                targetCoachName = attRecord.markedBy;
+            } else if (attRecord && attRecord.markedBy === 'Admin') {
+                targetCoachName = 'Admin';
+            } else if (attRecord && attRecord.status) {
+                targetCoachName = student.assignedCoach || 'Marked (Coach not specified)';
+            } else {
+                targetCoachName = 'Unassigned'; // Not marked on this date
+            }
+        } else {
+            // In all mode: group by assigned coach
+            targetCoachName = student.assignedCoach || 'Unassigned';
+        }
+
+        const studentEntry = {
+            student: student,
+            attRecord: attRecord,
+            status: isPresent ? 'Present' : (isAbsent ? 'Absent' : 'Not Marked')
+        };
+
+        if (isPresent) presentCountTotal++;
+
+        if (targetCoachName === 'Admin') {
+            adminGroup.push(studentEntry);
+            totalPracticingCount++;
+        } else if (targetCoachName && targetCoachName !== 'Unassigned') {
+            let existingKey = null;
+            for (let k of coachMap.keys()) {
+                if (k.toLowerCase() === targetCoachName.toLowerCase()) {
+                    existingKey = k;
+                    break;
+                }
+            }
+
+            if (!existingKey) {
+                coachMap.set(targetCoachName, {
+                    profile: { name: targetCoachName, mobile: '' },
+                    students: []
+                });
+                existingKey = targetCoachName;
+            }
+
+            coachMap.get(existingKey).students.push(studentEntry);
+            totalPracticingCount++;
+        } else {
+            unassignedGroup.push(studentEntry);
+        }
+    });
+
+    // Update KPI stats cards
+    let activeCoachesCount = 0;
+    coachMap.forEach(grp => {
+        if (grp.students.length > 0) activeCoachesCount++;
+    });
+
+    const totalStudentsCount = mode === 'daily' ? totalPracticingCount : genuineStudents.length;
+    const avgPerCoach = activeCoachesCount > 0 ? (totalStudentsCount / activeCoachesCount).toFixed(1) : 0;
+
+    const totalCoachesEl = document.getElementById('cat-stat-total-coaches');
+    const totalStudentsEl = document.getElementById('cat-stat-total-students');
+    const presentEl = document.getElementById('cat-stat-present');
+    const avgEl = document.getElementById('cat-stat-avg');
+
+    if (totalCoachesEl) totalCoachesEl.innerText = activeCoachesCount;
+    if (totalStudentsEl) totalStudentsEl.innerText = totalStudentsCount;
+    if (presentEl) presentEl.innerText = presentCountTotal;
+    if (avgEl) avgEl.innerText = avgPerCoach;
+
+    // Render HTML
+    let html = '';
+    const isAdminUser = currentUser && (currentUser.type === 'super' || currentUser.type === 'main' || currentUser.type === 'normal');
+
+    // Sort coaches with most students first
+    const sortedCoachKeys = Array.from(coachMap.keys()).sort((a, b) => {
+        const countA = coachMap.get(a).students.length;
+        const countB = coachMap.get(b).students.length;
+        return countB - countA;
+    });
+
+    sortedCoachKeys.forEach(coachName => {
+        const group = coachMap.get(coachName);
+        const studentsList = group.students;
+        
+        // Hide empty coaches in daily mode or search
+        if (studentsList.length === 0 && (mode === 'daily' || searchQuery)) {
+            return;
+        }
+
+        html += renderCoachBlock(coachName, studentsList, coachName, isAdminUser, coachProfiles, group.profile ? group.profile.mobile : '', mode, selectedDate);
+    });
+
+    // Admin Group (if any marked by admin)
+    if (adminGroup.length > 0) {
+        html += renderCoachBlock('Marked by Admin / Management', adminGroup, 'Admin', isAdminUser, coachProfiles, '', mode, selectedDate);
+    }
+
+    // Unassigned Group (students not marked on this date or not assigned to a coach)
+    if (unassignedGroup.length > 0) {
+        const unassignedTitle = mode === 'daily' ? `Not Marked on ${selectedDate}` : 'Unassigned / Not Marked Under Coach';
+        html += renderCoachBlock(unassignedTitle, unassignedGroup, 'Unassigned', isAdminUser, coachProfiles, '', mode, selectedDate);
+    }
+
+    if (totalStudentsCount === 0 && unassignedGroup.length === 0) {
+        container.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 40px; font-size: 1.1rem;">No students found for the selected date or search filter.</p>';
+        return;
+    }
+
+    container.innerHTML = html;
+}
+
+function renderCoachBlock(coachTitle, studentEntries, coachKey, isAdminUser, allCoachProfiles, coachContact, mode, selectedDate) {
+    if (!studentEntries || studentEntries.length === 0) return '';
+    
+    const presentCount = studentEntries.filter(s => s.status === 'Present').length;
+    const absentCount = studentEntries.filter(s => s.status === 'Absent').length;
+    const notMarkedCount = studentEntries.filter(s => s.status === 'Not Marked').length;
+    const isUnassigned = coachKey === 'Unassigned';
+    const isAdmin = coachKey === 'Admin';
+
+    const headerColor = isUnassigned ? '#94a3b8' : (isAdmin ? '#eab308' : '#38bdf8');
+    const badgeColor = isUnassigned ? 'rgba(148, 163, 184, 0.15)' : (isAdmin ? 'rgba(234, 179, 8, 0.15)' : 'rgba(56, 189, 248, 0.15)');
+
+    let subtitleText = '';
+    if (isUnassigned) {
+        subtitleText = (mode === 'daily') ? `Students with no attendance marked for ${selectedDate}` : 'Students not yet assigned to an individual coach';
+    } else if (isAdmin) {
+        subtitleText = (mode === 'daily') ? `Marked directly by Management / Admin on ${selectedDate}` : 'Marked by Management / Super Admin';
+    } else {
+        subtitleText = (mode === 'daily') ? `Date: <strong style="color: #38bdf8;">${selectedDate}</strong> • Marked by Coach: <strong style="color: #fff;">${escapeHtml(coachTitle)}</strong>` : (coachContact ? `<i class="fa-solid fa-phone" style="font-size: 0.75rem;"></i> ${escapeHtml(coachContact)}` : 'Assigned Students Roster');
+    }
+
+    let rowsHtml = '';
+    studentEntries.forEach((item, sIdx) => {
+        const s = item.student;
+        const statusBadge = item.status === 'Present'
+            ? '<span style="font-size: 0.8rem; background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); padding: 4px 10px; border-radius: 6px; font-weight: 600;"><i class="fa-solid fa-check"></i> Present</span>'
+            : (item.status === 'Absent'
+                ? '<span style="font-size: 0.8rem; background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); padding: 4px 10px; border-radius: 6px; font-weight: 600;"><i class="fa-solid fa-xmark"></i> Absent</span>'
+                : '<span style="font-size: 0.8rem; background: rgba(148, 163, 184, 0.15); color: #94a3b8; padding: 4px 10px; border-radius: 6px; font-weight: 600;">Not Marked</span>');
+
+        // Detailed marked by & time
+        let markedByDetail = '';
+        if (item.attRecord && item.attRecord.markedBy && !isUnassigned) {
+            markedByDetail += `<div style="font-size: 0.73rem; color: #38bdf8; margin-top: 3px;"><i class="fa-solid fa-user-check" style="font-size: 0.68rem;"></i> By: ${escapeHtml(item.attRecord.markedBy)}</div>`;
+        }
+        if (item.attRecord && item.attRecord.markedAt) {
+            try {
+                const timeStr = new Date(item.attRecord.markedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                markedByDetail += `<div style="font-size: 0.70rem; color: #94a3b8;"><i class="fa-regular fa-clock" style="font-size: 0.65rem;"></i> ${timeStr}</div>`;
+            } catch(e) {}
+        }
+
+        const initial = s.name ? s.name.trim().charAt(0).toUpperCase() : 'S';
+        const avatarStyle = s.pic ? `background-image: url('${s.pic}');` : `background: linear-gradient(135deg, #1e3a8a, #2563eb);`;
+
+        let assignDropdown = '';
+        if (isAdminUser) {
+            let coachOptions = `<option value="">Select Coach</option>`;
+            allCoachProfiles.forEach(cp => {
+                const isSel = (s.assignedCoach === cp.name || coachKey === cp.name) ? 'selected' : '';
+                coachOptions += `<option value="${escapeHtml(cp.name)}" ${isSel}>${escapeHtml(cp.name)}</option>`;
+            });
+            assignDropdown = `
+                <td style="padding: 10px 16px; text-align: center;">
+                    <select class="form-select" style="padding: 5px 8px; font-size: 0.82rem; background: rgba(15, 23, 42, 0.8); color: white; border: 1px solid #374151; border-radius: 6px;" onchange="assignStudentToCoach('${s.id}', this.value)">
+                        ${coachOptions}
+                    </select>
+                </td>
+            `;
+        }
+
+        rowsHtml += `
+            <tr style="border-bottom: 1px solid #374151; transition: background 0.2s;">
+                <td style="padding: 12px 16px; text-align: center; color: var(--text-muted); font-weight: 600;">${sIdx + 1}</td>
+                <td style="padding: 12px 16px;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <div class="profile-pic" style="width: 32px; height: 32px; min-width: 32px; border-radius: 50%; font-size: 0.8rem; ${avatarStyle}">
+                            ${s.pic ? '' : initial}
+                        </div>
+                        <span style="font-weight: 600; color: #fff;">${escapeHtml(s.name)}</span>
+                    </div>
+                </td>
+                <td style="padding: 12px 16px; text-align: center; color: var(--text-muted);">${s.age ? `${s.age} Yrs` : '-'}</td>
+                <td style="padding: 12px 16px; font-family: monospace; color: #cbd5e1;">${escapeHtml(s.id)}</td>
+                <td style="padding: 12px 16px; color: var(--text-muted);">${escapeHtml(s.fatherName || '-')}</td>
+                <td style="padding: 12px 16px; color: var(--text-muted);">${escapeHtml(s.contact || s.whatsapp || '-')}</td>
+                <td style="padding: 12px 16px; text-align: center;">${statusBadge}${markedByDetail}</td>
+                <td style="padding: 12px 16px; color: var(--text-muted); font-size: 0.88rem;">${escapeHtml(s.remarks || '-')}</td>
+                ${assignDropdown}
+            </tr>
+        `;
+    });
+
+    return `
+        <div class="coach-category-block" style="background: var(--bg-card); border-radius: 16px; border: 1px solid #374151; margin-bottom: 24px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.25);">
+            <div style="padding: 16px 22px; background: linear-gradient(135deg, rgba(30, 41, 59, 0.95), rgba(15, 23, 42, 0.95)); border-bottom: 1px solid #374151; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                <div style="display: flex; align-items: center; gap: 14px;">
+                    <div class="profile-pic" style="width: 44px; height: 44px; border-radius: 50%; background: ${isUnassigned ? '#475569' : (isAdmin ? '#854d0e' : '#1d4ed8')}; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.15rem; color: #fff;">
+                        ${isUnassigned ? '<i class="fa-solid fa-question"></i>' : (isAdmin ? '<i class="fa-solid fa-shield-halved"></i>' : coachTitle.trim().charAt(0).toUpperCase())}
+                    </div>
+                    <div>
+                        <h3 style="font-size: 1.25rem; font-weight: 700; color: ${headerColor}; margin: 0; display: flex; align-items: center; gap: 8px;">
+                            <span>${escapeHtml(coachTitle)}</span>
+                            <span style="font-size: 0.75rem; background: ${badgeColor}; color: ${headerColor}; padding: 2px 8px; border-radius: 6px; font-weight: 600;">${isUnassigned ? 'General' : (isAdmin ? 'Admin' : 'Coach')}</span>
+                        </h3>
+                        <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 3px;">
+                            ${subtitleText}
+                        </p>
+                    </div>
+                </div>
+                
+                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                    <span style="font-size: 0.95rem; font-weight: 700; background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); padding: 6px 14px; border-radius: 8px;">
+                        <i class="fa-solid fa-users"></i> ${studentEntries.length} Students
+                    </span>
+                    <span style="font-size: 0.85rem; font-weight: 600; background: rgba(56, 189, 248, 0.15); color: #38bdf8; padding: 6px 12px; border-radius: 8px;">
+                        <i class="fa-solid fa-check"></i> ${presentCount} Present
+                    </span>
+                    ${absentCount > 0 ? `
+                    <span style="font-size: 0.85rem; font-weight: 600; background: rgba(239, 68, 68, 0.15); color: #ef4444; padding: 6px 12px; border-radius: 8px;">
+                        <i class="fa-solid fa-xmark"></i> ${absentCount} Absent
+                    </span>
+                    ` : ''}
+                    ${notMarkedCount > 0 ? `
+                    <span style="font-size: 0.85rem; font-weight: 600; background: rgba(148, 163, 184, 0.15); color: #94a3b8; padding: 6px 12px; border-radius: 8px;">
+                        ${notMarkedCount} Not Marked
+                    </span>
+                    ` : ''}
+                </div>
+            </div>
+
+            <div style="overflow-x: auto;">
+                <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.92rem; color: #fff;">
+                    <thead>
+                        <tr style="background: rgba(15, 23, 42, 0.6); border-bottom: 1px solid #374151; color: var(--text-muted); font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.5px;">
+                            <th style="padding: 12px 16px; width: 50px; text-align: center;">#</th>
+                            <th style="padding: 12px 16px;">Student Name</th>
+                            <th style="padding: 12px 16px; width: 80px; text-align: center;">Age</th>
+                            <th style="padding: 12px 16px; width: 140px;">Student ID</th>
+                            <th style="padding: 12px 16px;">Parent Name</th>
+                            <th style="padding: 12px 16px;">Mobile</th>
+                            <th style="padding: 12px 16px; text-align: center; width: 140px;">Today Status</th>
+                            <th style="padding: 12px 16px;">Remarks</th>
+                            ${isAdminUser ? '<th style="padding: 12px 16px; text-align: center; width: 140px;">Assign Coach</th>' : ''}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rowsHtml}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+}
+
+function assignStudentToCoach(studentId, coachName) {
+    const student = (academyStudents || []).find(s => s.id === studentId);
+    if (!student) return;
+    student.assignedCoach = coachName || '';
+    saveData();
+    renderAcademyCategoriseList();
+}
+
+async function exportCategoriseListToExcel() {
+    try {
+        let dateInput = document.getElementById('categorise-list-date');
+        const selectedDate = dateInput ? dateInput.value : new Date().toISOString().split('T')[0];
+        const modeSelect = document.getElementById('categorise-mode-select');
+        const mode = modeSelect ? modeSelect.value : 'daily';
+
+        const genuineStudents = (academyStudents || []).filter(s => s.role !== 'coach');
+        const coachProfiles = getAllAcademyCoachProfiles();
+
+        // Build groups
+        const coachMap = new Map();
+        coachProfiles.forEach(c => coachMap.set(c.name, []));
+        const adminGroup = [];
+        const unassignedGroup = [];
+
+        genuineStudents.forEach(student => {
+            const attRecord = getAcademyAttendanceForDate(selectedDate, student.id);
+            const isPresent = attRecord && attRecord.status === 'Present';
+            const isAbsent = attRecord && attRecord.status === 'Absent';
+            const status = isPresent ? 'Present' : (isAbsent ? 'Absent' : 'Not Marked');
+            
+            let targetCoach = null;
+            if (mode === 'daily') {
+                if (attRecord && attRecord.markedBy && attRecord.markedBy !== 'Admin') targetCoach = attRecord.markedBy;
+                else if (attRecord && attRecord.markedBy === 'Admin') targetCoach = 'Admin';
+                else if (attRecord && attRecord.status) targetCoach = student.assignedCoach || 'Marked (Coach not specified)';
+                else targetCoach = 'Unassigned';
+            } else {
+                targetCoach = student.assignedCoach || 'Unassigned';
+            }
+
+            const item = { student, status, attRecord };
+            if (targetCoach === 'Admin') adminGroup.push(item);
+            else if (targetCoach && targetCoach !== 'Unassigned') {
+                if (!coachMap.has(targetCoach)) coachMap.set(targetCoach, []);
+                coachMap.get(targetCoach).push(item);
+            } else {
+                unassignedGroup.push(item);
+            }
+        });
+
+        const filename = `MUFC_Categorised_Students_${selectedDate}.xlsx`;
+
+        if (typeof ExcelJS !== 'undefined') {
+            const workbook = new ExcelJS.Workbook();
+            workbook.creator = 'MUFC Academy';
+            const worksheet = workbook.addWorksheet('Categorised List', {
+                views: [{ showGridLines: true }]
+            });
+
+            worksheet.columns = [
+                { key: 'coach', width: 22 },
+                { key: 'srNo', width: 8 },
+                { key: 'id', width: 17 },
+                { key: 'name', width: 26 },
+                { key: 'age', width: 10 },
+                { key: 'parent', width: 24 },
+                { key: 'mobile', width: 20 },
+                { key: 'status', width: 15 },
+                { key: 'remarks', width: 22 }
+            ];
+
+            // Title
+            const titleRow = worksheet.addRow(['MUFC ACADEMY - CATEGORISED STUDENTS BY COACH']);
+            worksheet.mergeCells('A1:I1');
+            titleRow.height = 34;
+            titleRow.getCell(1).font = { name: 'Calibri', size: 15, bold: true, color: { argb: 'FFFFFFFF' } };
+            titleRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F172A' } };
+            titleRow.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+
+            // Subtitle
+            const subRow = worksheet.addRow([`Report Date: ${selectedDate}   |   Mode: ${mode === 'daily' ? 'Daily Practice by Coach' : 'All Students by Coach'}`]);
+            worksheet.mergeCells('A2:I2');
+            subRow.height = 20;
+            subRow.getCell(1).font = { name: 'Calibri', size: 9.5, italic: true, color: { argb: 'FFCBD5E1' } };
+            subRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
+            subRow.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+
+            worksheet.addRow([]).height = 6;
+
+            const headerRow = worksheet.addRow(['Coach Name', 'Sr.', 'Student ID', 'Student Name', 'Age', 'Parent Name', 'Mobile Number', 'Status', 'Remarks']);
+            headerRow.height = 26;
+            headerRow.eachCell((c) => {
+                c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF991B1B' } };
+                c.font = { name: 'Calibri', size: 10.5, bold: true, color: { argb: 'FFFFFFFF' } };
+                c.alignment = { horizontal: 'center', vertical: 'middle' };
+                c.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
+            });
+
+            const renderSectionToSheet = (title, items) => {
+                if (!items || items.length === 0) return;
+                
+                // Coach subheader
+                const subHead = worksheet.addRow([`COACH: ${title.toUpperCase()} (${items.length} Students)`, '', '', '', '', '', '', '', '']);
+                const rowNum = subHead.number;
+                worksheet.mergeCells(`A${rowNum}:I${rowNum}`);
+                subHead.height = 24;
+                subHead.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
+                subHead.getCell(1).font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FF38BDF8' } };
+                subHead.getCell(1).alignment = { horizontal: 'left', vertical: 'middle' };
+
+                items.forEach((item, idx) => {
+                    const s = item.student;
+                    const r = worksheet.addRow([
+                        title,
+                        idx + 1,
+                        String(s.id || ''),
+                        s.name || '-',
+                        s.age ? `${s.age} Yrs` : '-',
+                        s.fatherName || '-',
+                        String(s.contact || s.whatsapp || '-'),
+                        item.status,
+                        s.remarks || '-'
+                    ]);
+                    r.height = 21;
+                    r.eachCell((cell, colNum) => {
+                        cell.border = { top: { style: 'thin', color: { argb: 'FFCBD5E1' } }, bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } }, left: { style: 'thin', color: { argb: 'FFCBD5E1' } }, right: { style: 'thin', color: { argb: 'FFCBD5E1' } } };
+                        cell.font = { name: 'Calibri', size: 10 };
+                        cell.alignment = { horizontal: (colNum === 4 || colNum === 6) ? 'left' : 'center', vertical: 'middle' };
+                        if (colNum === 3 || colNum === 7) cell.numFmt = '@';
+                    });
+                });
+            };
+
+            coachMap.forEach((items, cName) => {
+                if (items.length > 0) renderSectionToSheet(cName, items);
+            });
+            if (adminGroup.length > 0) renderSectionToSheet('Marked by Admin', adminGroup);
+            if (unassignedGroup.length > 0) renderSectionToSheet(mode === 'daily' ? `Not Marked on ${selectedDate}` : 'Unassigned Students', unassignedGroup);
+
+            const buffer = await workbook.xlsx.writeBuffer();
+            const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+
+        } else if (typeof XLSX !== 'undefined') {
+            const aoa = [
+                ['MUFC ACADEMY - CATEGORISED STUDENTS BY COACH'],
+                [`Date: ${selectedDate} | Mode: ${mode}`],
+                [],
+                ['Coach Name', 'Sr.', 'Student ID', 'Student Name', 'Age', 'Parent Name', 'Mobile Number', 'Status', 'Remarks']
+            ];
+
+            const appendItems = (title, items) => {
+                if (!items || items.length === 0) return;
+                aoa.push([`--- COACH: ${title} (${items.length} Students) ---`]);
+                items.forEach((item, idx) => {
+                    const s = item.student;
+                    aoa.push([
+                        title,
+                        idx + 1,
+                        String(s.id || ''),
+                        s.name || '-',
+                        s.age ? `${s.age} Yrs` : '-',
+                        s.fatherName || '-',
+                        String(s.contact || s.whatsapp || '-'),
+                        item.status,
+                        s.remarks || '-'
+                    ]);
+                });
+            };
+
+            coachMap.forEach((items, cName) => appendItems(cName, items));
+            if (adminGroup.length > 0) appendItems('Marked by Admin', adminGroup);
+            if (unassignedGroup.length > 0) appendItems(mode === 'daily' ? `Not Marked on ${selectedDate}` : 'Unassigned', unassignedGroup);
+
+            const ws = XLSX.utils.aoa_to_sheet(aoa);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Categorised List');
+            XLSX.writeFile(wb, filename);
+        }
+    } catch (e) {
+        console.error('Categorise export error:', e);
+        alert('Error exporting categorised list: ' + e.message);
+    }
 }
 
 // ================= ACADEMY PAYMENTS LOGIC =================
