@@ -37,7 +37,7 @@ body { background-color: #000; display: flex; justify-content: center; align-ite
 .login-buttons { display: flex; flex-direction: column; gap: 15px; }
 
 /* Buttons */
-.btn-primary, .btn-secondary {
+.btn-primary, .btn-secondary, .btn-excel {
     padding: 14px 22px; border-radius: 12px; font-weight: 600; cursor: pointer; border: none; font-size: 1.02rem; transition: 0.2s;
     display: flex; align-items: center; justify-content: center; gap: 10px;
 }
@@ -47,6 +47,19 @@ body { background-color: #000; display: flex; justify-content: center; align-ite
 .btn-secondary { background-color: var(--bg-card); color: #fff; border: 1px solid #374151; }
 .btn-secondary:hover:not(:disabled) { background-color: #374151; transform: translateY(-1px); }
 .btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-excel {
+    background: linear-gradient(135deg, #059669, #047857);
+    color: #ffffff;
+    border: 1px solid #10b981;
+    box-shadow: 0 4px 12px rgba(5, 150, 105, 0.25);
+}
+.btn-excel:hover:not(:disabled) {
+    background: linear-gradient(135deg, #10b981, #059669);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(16, 185, 129, 0.35);
+}
+.btn-excel:disabled { opacity: 0.6; cursor: not-allowed; }
+.btn-excel i { font-size: 1.1rem; color: #a7f3d0; }
 .w-100 { width: 100%; }
 
 /* Header */

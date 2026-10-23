@@ -1749,6 +1749,306 @@ function calculateTotalAttended(studentId) {
     return academyAttendance.filter(a => a.studentId === studentId && a.status === 'Present').length;
 }
 
+async function exportStudentsToExcel() {
+    const btn = document.getElementById('btn-export-students-excel');
+    const originalBtnHtml = btn ? btn.innerHTML : '';
+    
+    try {
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> <span>Exporting...</span>`;
+        }
+
+        // 1. Ensure students are loaded
+        let studentsList = (typeof academyStudents !== 'undefined' && Array.isArray(academyStudents)) ? [...academyStudents] : [];
+        if (studentsList.length === 0) {
+            try {
+                const res = await fetch('/api/data');
+                const data = await res.json();
+                if (data && Array.isArray(data.academyStudents)) {
+                    academyStudents = data.academyStudents;
+                    studentsList = [...academyStudents];
+                    if (data.academyAttendance) academyAttendance = data.academyAttendance;
+                }
+            } catch (e) {
+                console.warn('Could not fetch latest students for export:', e);
+            }
+        }
+
+        if (studentsList.length === 0) {
+            alert('No student records found in the database to export.');
+            return;
+        }
+
+        // 2. Sort students (youngest to oldest by age, then by name)
+        studentsList.sort((a, b) => {
+            const ageA = parseInt(a.age) || 999;
+            const ageB = parseInt(b.age) || 999;
+            if (ageA !== ageB) return ageA - ageB;
+            return (a.name || '').localeCompare(b.name || '');
+        });
+
+        const todayStr = new Date().toISOString().split('T')[0];
+        const dateFormatted = new Date().toLocaleDateString('en-GB', { 
+            day: '2-digit', 
+            month: 'short', 
+            year: 'numeric' 
+        });
+        const filename = `MUFC_Academy_Students_Database_${todayStr}.xlsx`;
+
+        // 3. Primary Export Engine: ExcelJS (Rich table with styled borders, header colors, auto-fit columns)
+        if (typeof ExcelJS !== 'undefined') {
+            const workbook = new ExcelJS.Workbook();
+            workbook.creator = 'MUFC Academy Portal';
+            workbook.created = new Date();
+            
+            const worksheet = workbook.addWorksheet('Students Database', {
+                views: [{ showGridLines: true }],
+                pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1 }
+            });
+
+            // Column widths
+            worksheet.columns = [
+                { key: 'srNo', width: 9 },
+                { key: 'id', width: 18 },
+                { key: 'name', width: 28 },
+                { key: 'fatherName', width: 26 },
+                { key: 'dob', width: 16 },
+                { key: 'age', width: 10 },
+                { key: 'gender', width: 12 },
+                { key: 'contact', width: 22 },
+                { key: 'whatsapp', width: 22 },
+                { key: 'joinDate', width: 16 },
+                { key: 'attended', width: 16 },
+                { key: 'status', width: 16 }
+            ];
+
+            // Row 1: Title Banner
+            const titleRow = worksheet.addRow(['MUFC ACADEMY - OFFICIAL STUDENTS DATABASE']);
+            worksheet.mergeCells('A1:L1');
+            titleRow.height = 36;
+            const titleCell = titleRow.getCell(1);
+            titleCell.font = { name: 'Calibri', size: 16, bold: true, color: { argb: 'FFFFFFFF' } };
+            titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F172A' } };
+            titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+
+            // Row 2: Subtitle Info Banner
+            const subTitleRow = worksheet.addRow([`Report Generated: ${dateFormatted}   |   Total Registered Students: ${studentsList.length}`]);
+            worksheet.mergeCells('A2:L2');
+            subTitleRow.height = 22;
+            const subCell = subTitleRow.getCell(1);
+            subCell.font = { name: 'Calibri', size: 10, italic: true, color: { argb: 'FFCBD5E1' } };
+            subCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
+            subCell.alignment = { horizontal: 'center', vertical: 'middle' };
+
+            // Row 3: Blank Spacing Row
+            const blankRow = worksheet.addRow([]);
+            blankRow.height = 8;
+
+            // Row 4: Column Headers
+            const headers = [
+                'Sr. No.',
+                'Student ID',
+                'Student Name',
+                'Parent Name',
+                'Date of Birth',
+                'Age',
+                'Gender',
+                'Mobile Number',
+                'WhatsApp Number',
+                'Joining Date',
+                'Total Attended',
+                'Status'
+            ];
+            const headerRow = worksheet.addRow(headers);
+            headerRow.height = 28;
+
+            const headerFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF991B1B' } }; // MUFC Crimson Red
+            const headerFont = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
+            const headerBorder = {
+                top: { style: 'medium', color: { argb: 'FF1E293B' } },
+                left: { style: 'thin', color: { argb: 'FF7F1D1D' } },
+                bottom: { style: 'medium', color: { argb: 'FF1E293B' } },
+                right: { style: 'thin', color: { argb: 'FF7F1D1D' } }
+            };
+
+            headerRow.eachCell({ includeEmpty: true }, (cell, colNum) => {
+                cell.fill = headerFill;
+                cell.font = headerFont;
+                cell.border = headerBorder;
+                cell.alignment = {
+                    horizontal: (colNum === 3 || colNum === 4) ? 'left' : 'center',
+                    vertical: 'middle'
+                };
+            });
+
+            // Rows 5+: Student Data Rows with Full Table Borders & Subtle Zebra Striping
+            const dataCellBorder = {
+                top: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+                left: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+                bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+                right: { style: 'thin', color: { argb: 'FFCBD5E1' } }
+            };
+
+            studentsList.forEach((s, idx) => {
+                const totalAttended = typeof calculateTotalAttended === 'function' ? calculateTotalAttended(s.id) : 0;
+                const statusText = s.pendingDeletion ? 'Pending Deletion' : (s.role === 'coach' ? 'Coach' : 'Active');
+                
+                const row = worksheet.addRow([
+                    idx + 1,
+                    String(s.id || ''),
+                    s.name || '-',
+                    s.fatherName || '-',
+                    s.dob || '-',
+                    s.age ? `${s.age} Yrs` : '-',
+                    s.gender || 'Male',
+                    String(s.contact || '-'),
+                    String(s.whatsapp || '-'),
+                    s.joinDate || '-',
+                    `${totalAttended} Days`,
+                    statusText
+                ]);
+
+                row.height = 23;
+                const isEven = (idx % 2 === 0);
+                const rowFill = {
+                    type: 'pattern',
+                    pattern: 'solid',
+                    fgColor: { argb: isEven ? 'FFFFFFFF' : 'FFF8FAFC' }
+                };
+
+                row.eachCell({ includeEmpty: true }, (cell, colNum) => {
+                    cell.fill = rowFill;
+                    cell.border = dataCellBorder;
+                    cell.font = {
+                        name: 'Calibri',
+                        size: 10.5,
+                        color: { argb: (colNum === 3) ? 'FF0F172A' : 'FF334155' },
+                        bold: (colNum === 1 || colNum === 3)
+                    };
+                    cell.alignment = {
+                        horizontal: (colNum === 3 || colNum === 4) ? 'left' : 'center',
+                        vertical: 'middle'
+                    };
+                    // Treat ID and phone numbers as text explicitly so leading zeros/plus signs are preserved
+                    if (colNum === 2 || colNum === 8 || colNum === 9) {
+                        cell.numFmt = '@';
+                    }
+                });
+            });
+
+            // Summary Footer Row
+            const summaryRowNumber = worksheet.rowCount + 1;
+            const summaryRow = worksheet.addRow([
+                'TOTAL',
+                '',
+                `Total Students: ${studentsList.length}`,
+                '', '', '', '', '', '', '', '', ''
+            ]);
+            worksheet.mergeCells(`A${summaryRowNumber}:B${summaryRowNumber}`);
+            summaryRow.height = 25;
+
+            const summaryBorder = {
+                top: { style: 'medium', color: { argb: 'FF94A3B8' } },
+                left: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+                bottom: { style: 'medium', color: { argb: 'FF94A3B8' } },
+                right: { style: 'thin', color: { argb: 'FFCBD5E1' } }
+            };
+
+            summaryRow.eachCell({ includeEmpty: true }, (cell, colNum) => {
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
+                cell.border = summaryBorder;
+                cell.font = { name: 'Calibri', size: 10.5, bold: true, color: { argb: 'FF0F172A' } };
+                cell.alignment = {
+                    horizontal: (colNum === 3) ? 'left' : 'center',
+                    vertical: 'middle'
+                };
+            });
+
+            // Download file
+            const buffer = await workbook.xlsx.writeBuffer();
+            const blob = new Blob([buffer], { 
+                type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+            });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+
+        } else if (typeof XLSX !== 'undefined') {
+            // Secondary Fallback: SheetJS
+            const aoa = [
+                ['MUFC ACADEMY - OFFICIAL STUDENTS DATABASE'],
+                [`Generated: ${dateFormatted} | Total Students: ${studentsList.length}`],
+                [],
+                [
+                    'Sr. No.',
+                    'Student ID',
+                    'Student Name',
+                    'Parent Name',
+                    'Date of Birth',
+                    'Age',
+                    'Gender',
+                    'Mobile Number',
+                    'WhatsApp Number',
+                    'Joining Date',
+                    'Total Attended',
+                    'Status'
+                ]
+            ];
+
+            studentsList.forEach((s, idx) => {
+                const totalAttended = typeof calculateTotalAttended === 'function' ? calculateTotalAttended(s.id) : 0;
+                const statusText = s.pendingDeletion ? 'Pending Deletion' : (s.role === 'coach' ? 'Coach' : 'Active');
+                aoa.push([
+                    idx + 1,
+                    String(s.id || ''),
+                    s.name || '-',
+                    s.fatherName || '-',
+                    s.dob || '-',
+                    s.age ? `${s.age} Yrs` : '-',
+                    s.gender || 'Male',
+                    String(s.contact || '-'),
+                    String(s.whatsapp || '-'),
+                    s.joinDate || '-',
+                    `${totalAttended} Days`,
+                    statusText
+                ]);
+            });
+
+            aoa.push([]);
+            aoa.push(['TOTAL', '', `Total Students: ${studentsList.length}`]);
+
+            const ws = XLSX.utils.aoa_to_sheet(aoa);
+            ws['!cols'] = [
+                { wch: 9 }, { wch: 18 }, { wch: 28 }, { wch: 26 }, { wch: 16 },
+                { wch: 10 }, { wch: 12 }, { wch: 22 }, { wch: 22 }, { wch: 16 },
+                { wch: 16 }, { wch: 16 }
+            ];
+
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Students Database');
+            XLSX.writeFile(wb, filename);
+
+        } else {
+            alert('Excel export library is loading. Please check your internet connection and try again.');
+        }
+
+    } catch (err) {
+        console.error('Export to Excel error:', err);
+        alert('An error occurred while generating Excel file: ' + err.message);
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = originalBtnHtml;
+        }
+    }
+}
+
 let currentAcademyStudentId = null;
 
 function openAcademyStudentDetails(id) {

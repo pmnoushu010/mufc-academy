@@ -7,10 +7,11 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>MUFC Academy</title>
-    <link rel="stylesheet" href="style.css?v=24">
+    <link rel="stylesheet" href="style.css?v=25">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -481,12 +482,17 @@
                     </div>
                 </section>
                 <section id="view-academy-admin" class="view">
-                    <div class="view-header">
+                    <div class="view-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
                         <div>
                             <h2>Academy Portal</h2>
                             <p style="font-size: 0.95rem; color: var(--text-muted); margin-top: 4px;">Manage MUFC Academy Students</p>
                         </div>
-                        <button class="btn-primary" onclick="showAddAcademyStudentModal()" title="Add New Student" style="padding: 12px 20px; font-size: 0.98rem;"><i class="fa-solid fa-user-plus"></i> <span style="margin-left: 6px;">Add Student</span></button>
+                        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                            <button id="btn-export-students-excel" class="btn-excel" onclick="exportStudentsToExcel()" title="Export complete student database to Excel" style="padding: 12px 18px; font-size: 0.95rem;">
+                                <i class="fa-solid fa-file-excel"></i> <span>Export to Excel</span>
+                            </button>
+                            <button class="btn-primary" onclick="showAddAcademyStudentModal()" title="Add New Student" style="padding: 12px 20px; font-size: 0.98rem;"><i class="fa-solid fa-user-plus"></i> <span style="margin-left: 6px;">Add Student</span></button>
+                        </div>
                     </div>
                     
                     <div style="margin-bottom: 20px;">
@@ -1384,6 +1390,6 @@
         </div>
 
     </div>
-    <script src="app.js?v=31"></script>
+    <script src="app.js?v=32"></script>
 </body>
 </html>
