@@ -4801,6 +4801,28 @@ function saveEditedAccountEntry() {
     renderAcademyAccounts();
 }
 
+function handleAccountMonthChange() {
+    const monthInput = document.getElementById('academy-account-month');
+    const monthStr = monthInput ? monthInput.value : '';
+    const dateInput = document.getElementById('acc-input-date');
+    if (dateInput && monthStr) {
+        const todayStr = new Date().toISOString().split('T')[0];
+        dateInput.value = todayStr.startsWith(monthStr) ? todayStr : `${monthStr}-01`;
+    }
+    renderAcademyAccounts();
+}
+
+function handleAccountDateInputChange() {
+    const dateInput = document.getElementById('acc-input-date');
+    if (!dateInput || !dateInput.value) return;
+    const entryMonth = dateInput.value.substring(0, 7);
+    const monthPicker = document.getElementById('academy-account-month');
+    if (monthPicker && monthPicker.value !== entryMonth) {
+        monthPicker.value = entryMonth;
+        renderAcademyAccounts();
+    }
+}
+
 function renderAcademyAccounts() {
     const list = document.getElementById('academy-accounts-list');
     if (!list) return;
@@ -4814,9 +4836,9 @@ function renderAcademyAccounts() {
         document.getElementById('academy-account-month').value = monthStr;
     }
 
-    // Default the date input in Add form to current month
+    // Only default the date input in Add form if it is currently empty
     const dateInput = document.getElementById('acc-input-date');
-    if (dateInput) {
+    if (dateInput && !dateInput.value) {
         const todayStr = new Date().toISOString().split('T')[0];
         dateInput.value = todayStr.startsWith(monthStr) ? todayStr : `${monthStr}-01`;
     }

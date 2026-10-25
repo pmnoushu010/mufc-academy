@@ -764,7 +764,7 @@
                             <p style="font-size: 0.8rem; color: var(--text-muted);">Manage balance sheet and expenses</p>
                         </div>
                         <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                            <input type="month" id="academy-account-month" class="form-select" style="padding: 8px 10px; width: 145px; background: rgba(15, 23, 42, 0.8);" onclick="this.showPicker()" onchange="renderAcademyAccounts()">
+                            <input type="month" id="academy-account-month" class="form-select" style="padding: 8px 10px; width: 145px; background: rgba(15, 23, 42, 0.8);" onclick="this.showPicker()" onchange="handleAccountMonthChange()">
                             <div id="academy-account-status-container" style="display: flex; align-items: center; gap: 8px;">
                                 <!-- Populated dynamically: Account Close button or Closed badge / Reopen button -->
                             </div>
@@ -809,7 +809,7 @@
                         <div id="account-add-form-inputs" style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;">
                             <div style="flex: 1; min-width: 120px;">
                                 <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Date</label>
-                                <input type="date" id="acc-input-date" class="form-input" style="width: 100%; padding: 10px; border-radius: 8px; background: rgba(15, 23, 42, 0.8); color: white; border: 1px solid #374151;" onclick="this.showPicker()">
+                                <input type="date" id="acc-input-date" class="form-input" style="width: 100%; padding: 10px; border-radius: 8px; background: rgba(15, 23, 42, 0.8); color: white; border: 1px solid #374151;" onclick="this.showPicker()" onchange="handleAccountDateInputChange()">
                             </div>
                             <div style="flex: 2; min-width: 200px;">
                                 <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Description</label>
@@ -1456,6 +1456,6 @@
         </div>
 
     </div>
-    <script src="app.js?v=37"></script>
+    <script src="app.js?v=38"></script>
 </body>
 </html>
