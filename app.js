@@ -2560,12 +2560,35 @@ function renderAcademyAttendance() {
 // ================= COACH ATTENDANCE LOGIC =================
 
 function getAcademyCoachAttendanceForDate(dateStr, coachId) {
-    return academyAttendance.find(a => a.date === dateStr && String(a.studentId) === String(coachId));
+    const coachIdStr = String(coachId);
+    const coachObj = (typeof getAllCoaches === 'function') 
+        ? getAllCoaches().find(c => String(c.id) === coachIdStr || String(c.mobile) === coachIdStr)
+        : null;
+    const mobileStr = coachObj && coachObj.mobile ? String(coachObj.mobile) : null;
+    
+    return (academyAttendance || []).find(a => 
+        a.date === dateStr && (
+            String(a.studentId) === coachIdStr || 
+            String(a.coachId) === coachIdStr ||
+            (mobileStr && (String(a.studentId) === mobileStr || String(a.coachId) === mobileStr))
+        )
+    );
 }
 
 function markAcademyCoachAttendance(coachId, dateStr, status) {
     const coachIdStr = String(coachId);
-    let record = academyAttendance.find(a => a.date === dateStr && String(a.studentId) === coachIdStr);
+    const coachObj = (typeof getAllCoaches === 'function') 
+        ? getAllCoaches().find(c => String(c.id) === coachIdStr || String(c.mobile) === coachIdStr)
+        : null;
+    const mobileStr = coachObj && coachObj.mobile ? String(coachObj.mobile) : null;
+    
+    let record = (academyAttendance || []).find(a => 
+        a.date === dateStr && (
+            String(a.studentId) === coachIdStr || 
+            String(a.coachId) === coachIdStr ||
+            (mobileStr && (String(a.studentId) === mobileStr || String(a.coachId) === mobileStr))
+        )
+    );
     if(record) {
         record.status = status;
         record.role = 'coach';
@@ -2578,11 +2601,22 @@ function markAcademyCoachAttendance(coachId, dateStr, status) {
     const expectedAccId = `acc_csal_${coachIdStr}_${monthStr}`;
     const accEntry = (academyAccounts || []).find(a => a.id === expectedAccId);
     if (accEntry) {
-        const coachObj = getAllCoaches().find(c => String(c.id) === coachIdStr);
-        if (coachObj) {
-            const calc = calculateCoachSalaryDetails(coachObj, monthStr);
+        const coachTarget = coachObj || getAllCoaches().find(c => String(c.id) === coachIdStr);
+        if (coachTarget) {
+            const calc = calculateCoachSalaryDetails(coachTarget, monthStr);
             accEntry.amount = calc.netSalary;
-            accEntry.description = `Coach Salary: ${coachObj.name} (${monthStr}) [${calc.presentCount}/${calc.totalWorkingDays} days, ${calc.leaveDays} leave]`;
+            accEntry.description = `Coach Salary: ${coachTarget.name} (${monthStr}) [${calc.presentCount}/${calc.totalWorkingDays} days, ${calc.leaveDays} leave]`;
+        }
+    }
+
+    // Keep coachSalaries record up to date as well
+    const salRec = (coachSalaries || []).find(cs => String(cs.coachId) === coachIdStr && cs.month === monthStr);
+    if (salRec) {
+        const coachTarget = coachObj || getAllCoaches().find(c => String(c.id) === coachIdStr);
+        if (coachTarget) {
+            const calc = calculateCoachSalaryDetails(coachTarget, monthStr);
+            salRec.leaveDays = calc.leaveDays;
+            salRec.netSalary = calc.netSalary;
         }
     }
 
@@ -2781,8 +2815,8 @@ function calculateCoachSalaryDetails(coach, monthStr) {
     
     // Check if salary record has custom leave adjustment, else use marked absentCount
     const salaryRecord = (coachSalaries || []).find(cs => String(cs.coachId) === coachIdStr && cs.month === monthStr);
-    const leaveDays = (salaryRecord && typeof salaryRecord.leaveDays === 'number') 
-        ? salaryRecord.leaveDays 
+    const leaveDays = (salaryRecord && typeof salaryRecord.customLeaveDays === 'number') 
+        ? salaryRecord.customLeaveDays 
         : absentCount;
         
     const deduction = Math.round((leaveDays * dailyRate) * 100) / 100;
@@ -3074,6 +3108,7 @@ function updateCoachLeaveDays(coachId, monthStr, value) {
         rec = { coachId: coachIdStr, month: monthStr };
         coachSalaries.push(rec);
     }
+    rec.customLeaveDays = val;
     rec.leaveDays = val;
     
     // Auto-sync account entry if recorded
@@ -3170,6 +3205,7 @@ function removeCoachSalaryFromAccounts(coachId, monthStr) {
     const rec = (coachSalaries || []).find(cs => String(cs.coachId) === String(coachId) && cs.month === monthStr);
     if (rec) {
         rec.status = 'Pending';
+        delete rec.customLeaveDays;
     }
     
     saveData();
