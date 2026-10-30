@@ -4070,7 +4070,11 @@ function openWhatsAppMessage(event, studentId, monthStr, phone, encodedMessage, 
         event.preventDefault();
         event.stopPropagation();
     }
-    markWhatsappSent(studentId, monthStr, btnElement);
+    if (btnElement) {
+        markWhatsappSent(studentId, monthStr, btnElement);
+    } else {
+        markWhatsappSent(studentId, monthStr);
+    }
 
     const cleanPhone = (phone || '').replace(/\D/g, '');
     const isMobile = isMobileOrTabletDevice();
@@ -4208,7 +4212,7 @@ function renderAcademyPayments() {
         const amountPaid = payment ? (parseFloat(payment.amount) || parseFloat(payment.paid) || 0) : 0;
 
         if (!hasAttended) {
-            messageText = `Your child, ${student.name}, was absent for the month of ${readableMonth}. We hope he is doing well.\n\nIf there is anything you'd like to discuss or share with us, please feel free to reach out to us.\n\nSincere regards,\nMUFC Soccer Academy`;
+            messageText = `Your child, ${student.name}, was absent for the month of ${readableMonth}. We hope he is doing well.\n\nIf there is anything you would like to discuss or share with us, please feel free to reach out to us.\n\nSincere regards,\nMUFC Soccer Academy`;
         } else if (isPaid && amountPaid > 0 && amountPaid < 150) {
             const remaining = 150 - amountPaid;
             messageText = `Dear ${addressee},\n\nThis is a reminder that we have received a partial payment of ${amountPaid} SAR for the academy fee of ${readableMonth} for your child, ${student.name}.\n\nThe remaining balance is ${remaining} SAR. Please arrange to complete the payment at your earliest convenience. Thank you!\n\nBest regards,\nMUFC Academy`;
@@ -4217,7 +4221,7 @@ function renderAcademyPayments() {
         } else {
             messageText = `Dear ${addressee},\n\nThis is a gentle reminder that the academy fee payment of 150 SAR for ${readableMonth} for your child, ${student.name}, is currently pending.\n\nPlease arrange to complete the payment at your earliest convenience. Thank you!\n\nBest regards,\nMUFC Academy`;
         }
-        const encodedMessage = encodeURIComponent(messageText);
+        const encodedMessage = encodeURIComponent(messageText).replace(/'/g, '%27');
 
         const div = document.createElement('div');
         div.className = 'player-card payment-player-card';
