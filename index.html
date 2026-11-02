@@ -7,7 +7,7 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>MUFC Academy</title>
-    <link rel="stylesheet" href="style.css?v=25">
+    <link rel="stylesheet" href="style.css?v=26">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
@@ -498,8 +498,26 @@
                         </div>
                     </div>
                     
-                    <div style="margin-bottom: 20px;">
-                        <input type="text" id="academy-student-search" placeholder="Search student name..." class="form-input" style="width: 100%; padding: 14px 18px; border-radius: 12px; background: var(--bg-card); color: #fff; border: 1px solid #374151; font-size: 1.05rem;" onkeyup="renderAcademyStudents()">
+                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 20px; flex-wrap: wrap;">
+                        <div style="flex: 1; min-width: 260px;">
+                            <input type="text" id="academy-student-search" placeholder="Search student name..." class="form-input" style="width: 100%; padding: 13px 18px; border-radius: 12px; background: var(--bg-card); color: #fff; border: 1px solid #374151; font-size: 1.02rem;" onkeyup="renderAcademyStudents()">
+                        </div>
+                        <div class="student-status-filter-group">
+                            <button type="button" class="student-filter-tab active" data-filter="active" onclick="setStudentStatusFilter('active')">
+                                <i class="fa-solid fa-circle-check" style="font-size: 0.85rem; color: #10b981;"></i>
+                                <span>Active</span>
+                                <span class="student-filter-count" id="count-students-active">0</span>
+                            </button>
+                            <button type="button" class="student-filter-tab" data-filter="inactive" onclick="setStudentStatusFilter('inactive')">
+                                <i class="fa-solid fa-circle-pause" style="font-size: 0.85rem; color: #f87171;"></i>
+                                <span>Inactive</span>
+                                <span class="student-filter-count" id="count-students-inactive">0</span>
+                            </button>
+                            <button type="button" class="student-filter-tab" data-filter="all" onclick="setStudentStatusFilter('all')">
+                                <span>All</span>
+                                <span class="student-filter-count" id="count-students-all">0</span>
+                            </button>
+                        </div>
                     </div>
                     
                     <div id="academy-student-list" class="player-list">
@@ -1128,6 +1146,7 @@
                     <p style="color: var(--text-muted); font-size: 1.02rem; margin-bottom: 22px;">ID: <span id="view-acad-id" style="color: #f1f5f9; font-weight: 600;"></span></p>
                     
                     <div style="text-align: left; background: var(--bg-dark); padding: 20px 22px; border-radius: 14px; display: flex; flex-direction: column; gap: 12px; font-size: 1.02rem; border: 1px solid #374151;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;"><strong style="color: #94a3b8;">Status:</strong> <span id="view-acad-status"></span></div>
                         <div style="display: flex; justify-content: space-between;"><strong style="color: #94a3b8;">Parent Name:</strong> <span id="view-acad-father" style="color: #fff; font-weight: 500;"></span></div>
                         <div style="display: flex; justify-content: space-between;"><strong style="color: #94a3b8;">Age:</strong> <span style="color: #fff; font-weight: 500;"><span id="view-acad-age"></span> (<span id="view-acad-dob" style="color: #cbd5e1;"></span>)</span></div>
                         <div style="display: flex; justify-content: space-between;"><strong style="color: #94a3b8;">Contact:</strong> <span id="view-acad-contact" style="color: #fff; font-weight: 500;"></span></div>
@@ -1135,9 +1154,10 @@
                         <div style="display: flex; justify-content: space-between;"><strong style="color: #94a3b8;">Joined:</strong> <span id="view-acad-joined" style="color: #fff; font-weight: 500;"></span></div>
                         <div style="border-top: 1px solid #374151; padding-top: 14px; margin-top: 4px; display: flex; justify-content: space-between; align-items: center;"><strong style="color: #94a3b8;">Total Attended:</strong> <span id="view-acad-attended" style="color: #10b981; font-weight: 700; font-size: 1.2rem;"></span></div>
                     </div>
-                    <div style="display: flex; gap: 12px; margin-top: 20px;">
-                        <button class="btn-primary" style="flex: 1; padding: 13px 18px; font-size: 1.02rem;" onclick="openEditAcademyStudentModal()"><i class="fa-solid fa-pen"></i> Edit Profile</button>
-                        <button class="btn-secondary" style="flex: 1; border-color: #ef4444; color: #ef4444; padding: 13px 18px; font-size: 1.02rem;" onclick="deleteAcademyStudent()"><i class="fa-solid fa-trash"></i> Delete</button>
+                    <div style="display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap;">
+                        <button id="view-acad-status-btn" class="btn-secondary" style="flex: 1; min-width: 130px; padding: 13px 14px; font-size: 0.95rem;" onclick="toggleStudentStatusFromModal()"></button>
+                        <button class="btn-primary" style="flex: 1; min-width: 130px; padding: 13px 14px; font-size: 0.95rem;" onclick="openEditAcademyStudentModal()"><i class="fa-solid fa-pen"></i> Edit Profile</button>
+                        <button class="btn-secondary" style="flex: 1; min-width: 100px; border-color: #ef4444; color: #ef4444; padding: 13px 14px; font-size: 0.95rem;" onclick="deleteAcademyStudent()"><i class="fa-solid fa-trash"></i> Delete</button>
                     </div>
                 </div>
             </div>
@@ -1186,6 +1206,13 @@
                     <div class="form-group">
                         <label>Joining Date</label>
                         <input type="text" onfocus="(this.type='date')" onblur="(this.value == '' ? this.type='text' : this.type='date')" id="edit-acad-join-date" placeholder="Joining Date">
+                    </div>
+                    <div class="form-group">
+                        <label>Student Status</label>
+                        <select id="edit-acad-status" class="form-select" style="width: 100%; padding: 12px; border-radius: 10px; background: rgba(15, 23, 42, 0.8); color: white; border: 1px solid #374151;">
+                            <option value="active">Active (Attending Academy)</option>
+                            <option value="inactive">Inactive (Long Leave / Left Academy)</option>
+                        </select>
                     </div>
                     <div class="form-group">
                         <label>Update Profile Picture</label>
@@ -1456,6 +1483,6 @@
         </div>
 
     </div>
-    <script src="app.js?v=40"></script>
+    <script src="app.js?v=41"></script>
 </body>
 </html>

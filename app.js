@@ -1660,7 +1660,8 @@ async function addAcademyStudent() {
             whatsapp: `${whatsappCode} ${whatsappNum}`,
             joinDate: new Date().toISOString().split('T')[0],
             pic: null,
-            role: 'coach'
+            role: 'coach',
+            status: 'active'
         });
         
         saveData();
@@ -1690,7 +1691,8 @@ async function addAcademyStudent() {
             whatsapp: `${whatsappCode} ${whatsappNum}`,
             joinDate: joinDate,
             pic: picBase64,
-            role: 'student'
+            role: 'student',
+            status: 'active'
         });
         
         saveData();
@@ -1705,18 +1707,79 @@ async function addAcademyStudent() {
     });
 }
 
+function isStudentActive(student) {
+    if (!student) return false;
+    return student.status !== 'inactive';
+}
+
+let currentStudentStatusTab = 'active';
+
+function setStudentStatusFilter(filter) {
+    currentStudentStatusTab = filter || 'active';
+    document.querySelectorAll('.student-filter-tab').forEach(btn => {
+        if (btn.getAttribute('data-filter') === currentStudentStatusTab) {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
+    });
+    renderAcademyStudents();
+}
+
+function toggleAcademyStudentStatus(event, studentId) {
+    if (event) {
+        event.stopPropagation();
+        event.preventDefault();
+    }
+    const student = academyStudents.find(s => String(s.id) === String(studentId));
+    if (!student) return;
+
+    const currentlyActive = isStudentActive(student);
+    const newStatus = currentlyActive ? 'inactive' : 'active';
+
+    const confirmText = currentlyActive
+        ? `Are you sure you want to mark "${student.name}" as INACTIVE?\n\nThey will be hidden from Attendance, Payments, and Reports until reactivated.`
+        : `Mark "${student.name}" as ACTIVE again?\n\nThey will reappear in Attendance, Payments, and Reports.`;
+
+    if (!confirm(confirmText)) return;
+
+    student.status = newStatus;
+    saveData();
+    renderAcademyStudents();
+
+    // Dynamically refresh dependent views if present
+    if (typeof renderAcademyAttendance === 'function') renderAcademyAttendance();
+    if (typeof renderAcademyPayments === 'function') renderAcademyPayments();
+    if (typeof renderAcademyReports === 'function') renderAcademyReports();
+    if (typeof renderAcademyCategoriseList === 'function') renderAcademyCategoriseList();
+}
+
 function renderAcademyStudents() {
     const list = document.getElementById('academy-student-list');
     if(!list) return;
     
     list.innerHTML = '';
     
+    // Update live count badges
+    const totalActive = academyStudents.filter(s => isStudentActive(s)).length;
+    const totalInactive = academyStudents.filter(s => !isStudentActive(s)).length;
+    const totalAll = academyStudents.length;
+
+    const countActiveEl = document.getElementById('count-students-active');
+    if (countActiveEl) countActiveEl.innerText = totalActive;
+    const countInactiveEl = document.getElementById('count-students-inactive');
+    if (countInactiveEl) countInactiveEl.innerText = totalInactive;
+    const countAllEl = document.getElementById('count-students-all');
+    if (countAllEl) countAllEl.innerText = totalAll;
+
     const searchInput = document.getElementById('academy-student-search');
-    const searchQuery = searchInput ? searchInput.value.toLowerCase() : '';
+    const searchQuery = searchInput ? searchInput.value.toLowerCase().trim() : '';
     
     let studentsToRender = academyStudents.filter(s => {
         if (searchQuery && !s.name.toLowerCase().includes(searchQuery)) return false;
-        return true;
+        if (currentStudentStatusTab === 'active') return isStudentActive(s);
+        if (currentStudentStatusTab === 'inactive') return !isStudentActive(s);
+        return true; // 'all'
     });
     
     // Sort by age ascending (youngest to oldest)
@@ -1727,12 +1790,16 @@ function renderAcademyStudents() {
     });
     
     if(studentsToRender.length === 0) {
-        list.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 20px;">No students found.</p>';
+        const emptyMsg = currentStudentStatusTab === 'inactive'
+            ? 'No inactive students found.'
+            : (currentStudentStatusTab === 'active' ? 'No active students found.' : 'No students found.');
+        list.innerHTML = `<p style="color: var(--text-muted); text-align: center; padding: 20px;">${emptyMsg}</p>`;
         return;
     }
     
     studentsToRender.forEach(student => {
         const totalAttended = calculateTotalAttended(student.id);
+        const isActive = isStudentActive(student);
         const div = document.createElement('div');
         div.className = 'player-card';
         div.style.cursor = 'pointer';
@@ -1766,9 +1833,17 @@ function renderAcademyStudents() {
                     </p>
                 </div>
             </div>
-            <div class="player-card-action">
-                <span>View Details</span>
-                <i class="fa-solid fa-chevron-right" style="font-size: 0.85rem;"></i>
+            <div style="display: flex; align-items: center; gap: 10px; flex-shrink: 0;">
+                <button class="student-status-btn ${isActive ? 'status-btn-active' : 'status-btn-inactive'}" 
+                        onclick="toggleAcademyStudentStatus(event, '${student.id}')"
+                        title="Click to mark as ${isActive ? 'Inactive' : 'Active'}">
+                    <i class="fa-solid ${isActive ? 'fa-circle-check' : 'fa-circle-pause'}"></i>
+                    <span>${isActive ? 'Active' : 'Inactive'}</span>
+                </button>
+                <div class="player-card-action">
+                    <span>View Details</span>
+                    <i class="fa-solid fa-chevron-right" style="font-size: 0.85rem;"></i>
+                </div>
             </div>
         `;
         list.appendChild(div);
@@ -1922,7 +1997,7 @@ async function exportStudentsToExcel() {
 
             studentsList.forEach((s, idx) => {
                 const totalAttended = typeof calculateTotalAttended === 'function' ? calculateTotalAttended(s.id) : 0;
-                const statusText = s.pendingDeletion ? 'Pending Deletion' : (s.role === 'coach' ? 'Coach' : 'Active');
+                const statusText = s.pendingDeletion ? 'Pending Deletion' : (s.role === 'coach' ? 'Coach' : (s.status === 'inactive' ? 'Inactive' : 'Active'));
                 
                 const row = worksheet.addRow([
                     idx + 1,
@@ -2033,7 +2108,7 @@ async function exportStudentsToExcel() {
 
             studentsList.forEach((s, idx) => {
                 const totalAttended = typeof calculateTotalAttended === 'function' ? calculateTotalAttended(s.id) : 0;
-                const statusText = s.pendingDeletion ? 'Pending Deletion' : (s.role === 'coach' ? 'Coach' : 'Active');
+                const statusText = s.pendingDeletion ? 'Pending Deletion' : (s.role === 'coach' ? 'Coach' : (s.status === 'inactive' ? 'Inactive' : 'Active'));
                 aoa.push([
                     idx + 1,
                     String(s.id || ''),
@@ -2096,6 +2171,20 @@ function openAcademyStudentDetails(id) {
         nameEl.style.color = (student.gender === 'Female') ? '#ec4899' : '';
     }
     
+    const isActive = isStudentActive(student);
+    const statusEl = document.getElementById('view-acad-status');
+    if (statusEl) {
+        statusEl.innerHTML = isActive 
+            ? `<span style="color: #10b981; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;"><i class="fa-solid fa-circle-check"></i> Active</span>`
+            : `<span style="color: #ef4444; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;"><i class="fa-solid fa-circle-pause"></i> Inactive</span>`;
+    }
+    const statusBtn = document.getElementById('view-acad-status-btn');
+    if (statusBtn) {
+        statusBtn.innerHTML = isActive
+            ? `<i class="fa-solid fa-circle-pause" style="color: #ef4444;"></i> Set Inactive`
+            : `<i class="fa-solid fa-circle-check" style="color: #10b981;"></i> Set Active`;
+    }
+    
     document.getElementById('view-acad-id').innerText = student.id;
     document.getElementById('view-acad-father').innerText = student.fatherName;
     document.getElementById('view-acad-age').innerText = student.age;
@@ -2107,6 +2196,12 @@ function openAcademyStudentDetails(id) {
     
     document.getElementById('view-academy-student-modal').classList.add('active');
     currentAcademyStudentId = id;
+}
+
+function toggleStudentStatusFromModal() {
+    if (!currentAcademyStudentId) return;
+    toggleAcademyStudentStatus(null, currentAcademyStudentId);
+    openAcademyStudentDetails(currentAcademyStudentId);
 }
 
 function openEditAcademyStudentModal() {
@@ -2123,6 +2218,11 @@ function openEditAcademyStudentModal() {
     document.getElementById('edit-acad-dob').value = student.dob;
     document.getElementById('edit-acad-contact').value = student.contact;
     document.getElementById('edit-acad-join-date').value = student.joinDate;
+    
+    const statusSelect = document.getElementById('edit-acad-status');
+    if (statusSelect) {
+        statusSelect.value = isStudentActive(student) ? 'active' : 'inactive';
+    }
     
     const parts = student.whatsapp.split(' ');
     if(parts.length > 1) {
@@ -2149,6 +2249,7 @@ async function updateAcademyStudent() {
     const whatsappCode = document.getElementById('edit-acad-whatsapp-code').value;
     const whatsappNum = document.getElementById('edit-acad-whatsapp').value.trim();
     const joinDate = document.getElementById('edit-acad-join-date').value;
+    const statusSelect = document.getElementById('edit-acad-status');
     
     if(!name || !fatherName || !dob || !contact || !whatsappNum || !joinDate) {
         return alert("Please fill all required fields.");
@@ -2168,10 +2269,19 @@ async function updateAcademyStudent() {
     student.whatsapp = `${whatsappCode} ${whatsappNum}`;
     student.joinDate = joinDate;
     student.pic = picBase64;
+    if (statusSelect) {
+        student.status = statusSelect.value;
+    }
     
     saveData();
     closeModal();
     renderAcademyStudents();
+    
+    if (typeof renderAcademyAttendance === 'function') renderAcademyAttendance();
+    if (typeof renderAcademyPayments === 'function') renderAcademyPayments();
+    if (typeof renderAcademyReports === 'function') renderAcademyReports();
+    if (typeof renderAcademyCategoriseList === 'function') renderAcademyCategoriseList();
+    
     alert("Academy Student profile updated successfully!");
 }
 
@@ -2453,8 +2563,8 @@ function renderAcademyAttendance() {
     
     list.innerHTML = '';
     
-    // Filter genuine students only (exclude coaches so they do not show under student attendance)
-    const genuineStudents = academyStudents.filter(s => s.role !== 'coach');
+    // Filter genuine active students only (exclude coaches and inactive students so they do not show under student attendance)
+    const genuineStudents = academyStudents.filter(s => s.role !== 'coach' && isStudentActive(s));
     
     if(genuineStudents.length === 0) {
         list.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 20px;">No students registered yet.</p>';
@@ -3510,7 +3620,7 @@ function renderAcademyCategoriseList() {
     const searchInput = document.getElementById('categorise-list-search');
     const searchQuery = searchInput ? searchInput.value.trim().toLowerCase() : '';
 
-    const genuineStudents = (academyStudents || []).filter(s => s.role !== 'coach');
+    const genuineStudents = (academyStudents || []).filter(s => s.role !== 'coach' && isStudentActive(s));
 
     // Get all known coach profiles
     const coachProfiles = getAllAcademyCoachProfiles();
@@ -3823,7 +3933,7 @@ async function exportCategoriseListToExcel() {
         const modeSelect = document.getElementById('categorise-mode-select');
         const mode = modeSelect ? modeSelect.value : 'daily';
 
-        const genuineStudents = (academyStudents || []).filter(s => s.role !== 'coach');
+        const genuineStudents = (academyStudents || []).filter(s => s.role !== 'coach' && isStudentActive(s));
         const coachProfiles = getAllAcademyCoachProfiles();
 
         // Build groups
@@ -4142,6 +4252,7 @@ function renderAcademyPayments() {
 
     let studentsToRender = academyStudents.filter(s => {
         if (s.role === 'coach') return false;
+        if (!isStudentActive(s)) return false;
         
         if (searchQuery && !s.name.toLowerCase().includes(searchQuery)) return false;
         
@@ -4537,7 +4648,7 @@ function renderAcademyReports() {
     
     let tbody = `<tbody>`;
     
-    const studentsToRender = [...academyStudents];
+    const studentsToRender = academyStudents.filter(s => isStudentActive(s));
     
     studentsToRender.sort((a, b) => {
         let ageA = parseInt(a.age);
@@ -5869,7 +5980,7 @@ function renderAcademyDashboard() {
     DASHBOARD_AGE_BRACKETS.forEach(b => { categoryCounts[b.id] = 0; });
     let unknownAgeCount = 0;
 
-    const nonCoachStudents = academyStudents.filter(s => s.role !== 'coach');
+    const nonCoachStudents = academyStudents.filter(s => s.role !== 'coach' && isStudentActive(s));
     nonCoachStudents.forEach(s => {
         const catId = getStudentAgeCategoryId(s);
         if (catId === 'unknown') {
@@ -6297,7 +6408,7 @@ function renderDashboardAgeStudents() {
 
     const selectedCategory = selectEl ? selectEl.value : 'all';
     
-    let filtered = academyStudents.filter(s => s.role !== 'coach');
+    let filtered = academyStudents.filter(s => s.role !== 'coach' && isStudentActive(s));
     if (selectedCategory !== 'all') {
         filtered = filtered.filter(s => getStudentAgeCategoryId(s) === selectedCategory);
     }
