@@ -54,6 +54,7 @@ async function initData() {
                 { id: "att_3", matchId: "m3", type: "match", playerId: 2, playerName: "Bruno Fernandes", status: "Approved", requestedAt: "15:00 PM" }
             ];
             academyStudents = data.academyStudents || [];
+            refreshAllStudentAges();
             academyAttendance = data.academyAttendance || [];
             academyPayments = data.academyPayments || [];
             coaches = data.coaches || [];
@@ -143,7 +144,10 @@ setInterval(async () => {
             if(data.matches) matches = data.matches;
             if(data.practiceSession) practiceSession = data.practiceSession;
             if(data.attendance) attendance = data.attendance;
-            if(data.academyStudents) academyStudents = data.academyStudents;
+            if(data.academyStudents) {
+                academyStudents = data.academyStudents;
+                refreshAllStudentAges();
+            }
             if(data.academyAttendance) academyAttendance = data.academyAttendance;
             if(data.academyPayments) academyPayments = data.academyPayments;
             if(data.coaches) coaches = data.coaches;
@@ -1624,11 +1628,60 @@ function showAddAcademyStudentModal() {
 }
 
 function calculateAge(dobString) {
-    if (!dobString) return '';
-    const dob = new Date(dobString);
-    const diff_ms = Date.now() - dob.getTime();
-    const age_dt = new Date(diff_ms); 
-    return Math.abs(age_dt.getUTCFullYear() - 1970);
+    if (!dobString || dobString === '-') return '';
+    
+    let birthDate;
+    if (typeof dobString === 'string') {
+        const parts = dobString.trim().split(/[-/.]/);
+        if (parts.length === 3) {
+            if (parts[0].length === 4) {
+                // YYYY-MM-DD
+                birthDate = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+            } else if (parts[2].length === 4) {
+                // DD-MM-YYYY or DD/MM/YYYY
+                birthDate = new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10));
+            }
+        }
+    }
+    if (!birthDate || isNaN(birthDate.getTime())) {
+        birthDate = new Date(dobString);
+    }
+    if (isNaN(birthDate.getTime())) return '';
+
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    
+    // If birth month hasn't occurred this year, or if in birth month and birth day hasn't occurred yet
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+    }
+    
+    return age >= 0 ? age : 0;
+}
+
+function getStudentAge(student) {
+    if (!student) return '-';
+    if (student.role === 'coach') return (student.age !== undefined && student.age !== null && student.age !== '') ? student.age : '-';
+    if (student.dob && student.dob !== '-') {
+        const calculated = calculateAge(student.dob);
+        if (calculated !== '' && !isNaN(calculated)) {
+            return calculated;
+        }
+    }
+    return (student.age !== undefined && student.age !== null && student.age !== '' && student.age !== '-') ? student.age : '-';
+}
+
+function refreshAllStudentAges() {
+    if (!Array.isArray(academyStudents)) return;
+    academyStudents.forEach(s => {
+        if (s && s.role !== 'coach' && s.dob && s.dob !== '-') {
+            const calculated = calculateAge(s.dob);
+            if (calculated !== '' && !isNaN(calculated)) {
+                s.age = calculated;
+            }
+        }
+    });
 }
 
 async function addAcademyStudent() {
@@ -1784,8 +1837,8 @@ function renderAcademyStudents() {
     
     // Sort by age ascending (youngest to oldest)
     studentsToRender.sort((a, b) => {
-        const ageA = parseInt(a.age) || 999; // Put missing ages at the end
-        const ageB = parseInt(b.age) || 999;
+        const ageA = parseInt(getStudentAge(a)) || 999; // Put missing ages at the end
+        const ageB = parseInt(getStudentAge(b)) || 999;
         return ageA - ageB;
     });
     
@@ -1800,6 +1853,7 @@ function renderAcademyStudents() {
     studentsToRender.forEach(student => {
         const totalAttended = calculateTotalAttended(student.id);
         const isActive = isStudentActive(student);
+        const stAge = getStudentAge(student);
         const div = document.createElement('div');
         div.className = 'player-card';
         div.style.cursor = 'pointer';
@@ -1822,7 +1876,7 @@ function renderAcademyStudents() {
                 <div style="flex: 1; min-width: 0;">
                     <h3 style="color: ${nameColor};">
                         <span>${escapeHtml(student.name)}</span>
-                        ${student.age ? `<span class="player-age-badge">${student.age} Yrs</span>` : ''}
+                        ${stAge && stAge !== '-' ? `<span class="player-age-badge">${stAge} Yrs</span>` : ''}
                         ${student.role === 'coach' ? '<span style="font-size: 0.8rem; background: rgba(59,130,246,0.2); color: #3b82f6; padding: 2px 8px; border-radius: 6px; font-weight: 600;">Coach</span>' : ''}
                         ${student.pendingDeletion ? '<span style="font-size: 0.8rem; background: rgba(239, 68, 68, 0.2); color: #ef4444; padding: 2px 8px; border-radius: 6px; font-weight: 600;">Pending Deletion</span>' : ''}
                     </h3>
@@ -1887,8 +1941,8 @@ async function exportStudentsToExcel() {
 
         // 2. Sort students (youngest to oldest by age, then by name)
         studentsList.sort((a, b) => {
-            const ageA = parseInt(a.age) || 999;
-            const ageB = parseInt(b.age) || 999;
+            const ageA = parseInt(getStudentAge(a)) || 999;
+            const ageB = parseInt(getStudentAge(b)) || 999;
             if (ageA !== ageB) return ageA - ageB;
             return (a.name || '').localeCompare(b.name || '');
         });
@@ -1998,6 +2052,7 @@ async function exportStudentsToExcel() {
             studentsList.forEach((s, idx) => {
                 const totalAttended = typeof calculateTotalAttended === 'function' ? calculateTotalAttended(s.id) : 0;
                 const statusText = s.pendingDeletion ? 'Pending Deletion' : (s.role === 'coach' ? 'Coach' : (s.status === 'inactive' ? 'Inactive' : 'Active'));
+                const stAge = getStudentAge(s);
                 
                 const row = worksheet.addRow([
                     idx + 1,
@@ -2005,7 +2060,7 @@ async function exportStudentsToExcel() {
                     s.name || '-',
                     s.fatherName || '-',
                     s.dob || '-',
-                    s.age ? `${s.age} Yrs` : '-',
+                    stAge && stAge !== '-' ? `${stAge} Yrs` : '-',
                     s.gender || 'Male',
                     String(s.contact || '-'),
                     String(s.whatsapp || '-'),
@@ -2109,13 +2164,14 @@ async function exportStudentsToExcel() {
             studentsList.forEach((s, idx) => {
                 const totalAttended = typeof calculateTotalAttended === 'function' ? calculateTotalAttended(s.id) : 0;
                 const statusText = s.pendingDeletion ? 'Pending Deletion' : (s.role === 'coach' ? 'Coach' : (s.status === 'inactive' ? 'Inactive' : 'Active'));
+                const stAge = getStudentAge(s);
                 aoa.push([
                     idx + 1,
                     String(s.id || ''),
                     s.name || '-',
                     s.fatherName || '-',
                     s.dob || '-',
-                    s.age ? `${s.age} Yrs` : '-',
+                    stAge && stAge !== '-' ? `${stAge} Yrs` : '-',
                     s.gender || 'Male',
                     String(s.contact || '-'),
                     String(s.whatsapp || '-'),
@@ -2187,7 +2243,7 @@ function openAcademyStudentDetails(id) {
     
     document.getElementById('view-acad-id').innerText = student.id;
     document.getElementById('view-acad-father').innerText = student.fatherName;
-    document.getElementById('view-acad-age').innerText = student.age;
+    document.getElementById('view-acad-age').innerText = getStudentAge(student);
     document.getElementById('view-acad-dob').innerText = student.dob;
     document.getElementById('view-acad-contact').innerText = student.contact;
     document.getElementById('view-acad-whatsapp').innerText = student.whatsapp;
@@ -2589,10 +2645,8 @@ function renderAcademyAttendance() {
     const filteredStudents = genuineStudents.filter(s => s.name.toLowerCase().includes(searchQuery));
     
     filteredStudents.sort((a, b) => {
-        let ageA = parseInt(a.age);
-        if (isNaN(ageA)) ageA = 999;
-        let ageB = parseInt(b.age);
-        if (isNaN(ageB)) ageB = 999;
+        let ageA = parseInt(getStudentAge(a)) || 999;
+        let ageB = parseInt(getStudentAge(b)) || 999;
         return ageA - ageB;
     });
 
@@ -2643,7 +2697,7 @@ function renderAcademyAttendance() {
                     ${student.pic ? '' : initial}
                 </div>
                 <div style="overflow: hidden;">
-                    <h3 style="font-size: 1.25rem; font-weight: 600; color: ${nameColor}; white-space: nowrap; text-overflow: ellipsis; overflow: hidden;">${escapeHtml(student.name)} ${(student.age && student.age !== '-' ? `<span class="player-age-badge" style="margin-left: 6px;">${student.age} Yrs</span>` : '')} ${paidCheckmark}</h3>
+                    <h3 style="font-size: 1.25rem; font-weight: 600; color: ${nameColor}; white-space: nowrap; text-overflow: ellipsis; overflow: hidden;">${escapeHtml(student.name)} ${(() => { const stAge = getStudentAge(student); return (stAge && stAge !== '-' ? `<span class="player-age-badge" style="margin-left: 6px;">${stAge} Yrs</span>` : ''); })()} ${paidCheckmark}</h3>
                     <p style="font-size: 0.95rem; color: var(--text-muted); margin-top: 3px;">ID: <strong style="color: #f1f5f9;">${escapeHtml(student.id)}</strong> | Parent: <strong style="color: #f1f5f9;">${escapeHtml(student.fatherName || 'N/A')}</strong></p>
                 </div>
             </div>
@@ -3845,7 +3899,7 @@ function renderCoachBlock(coachTitle, studentEntries, coachKey, isAdminUser, all
                         <span style="font-weight: 600; color: #fff;">${escapeHtml(s.name)}</span>
                     </div>
                 </td>
-                <td style="padding: 12px 16px; text-align: center; color: var(--text-muted);">${s.age ? `${s.age} Yrs` : '-'}</td>
+                <td style="padding: 12px 16px; text-align: center; color: var(--text-muted);">${(() => { const stAge = getStudentAge(s); return stAge && stAge !== '-' ? `${stAge} Yrs` : '-'; })()}</td>
                 <td style="padding: 12px 16px; font-family: monospace; color: #cbd5e1;">${escapeHtml(s.id)}</td>
                 <td style="padding: 12px 16px; color: var(--text-muted);">${escapeHtml(s.fatherName || '-')}</td>
                 <td style="padding: 12px 16px; color: var(--text-muted);">${escapeHtml(s.contact || s.whatsapp || '-')}</td>
@@ -4030,12 +4084,13 @@ async function exportCategoriseListToExcel() {
 
                 items.forEach((item, idx) => {
                     const s = item.student;
+                    const stAge = getStudentAge(s);
                     const r = worksheet.addRow([
                         title,
                         idx + 1,
                         String(s.id || ''),
                         s.name || '-',
-                        s.age ? `${s.age} Yrs` : '-',
+                        stAge && stAge !== '-' ? `${stAge} Yrs` : '-',
                         s.fatherName || '-',
                         String(s.contact || s.whatsapp || '-'),
                         item.status,
@@ -4081,12 +4136,13 @@ async function exportCategoriseListToExcel() {
                 aoa.push([`--- COACH: ${title} (${items.length} Students) ---`]);
                 items.forEach((item, idx) => {
                     const s = item.student;
+                    const stAge = getStudentAge(s);
                     aoa.push([
                         title,
                         idx + 1,
                         String(s.id || ''),
                         s.name || '-',
-                        s.age ? `${s.age} Yrs` : '-',
+                        stAge && stAge !== '-' ? `${stAge} Yrs` : '-',
                         s.fatherName || '-',
                         String(s.contact || s.whatsapp || '-'),
                         item.status,
@@ -4288,10 +4344,8 @@ function renderAcademyPayments() {
         }
 
         // 3. Secondary order: by age ascending, then alphabetically by name
-        let ageA = parseInt(a.age);
-        if (isNaN(ageA)) ageA = 999;
-        let ageB = parseInt(b.age);
-        if (isNaN(ageB)) ageB = 999;
+        let ageA = parseInt(getStudentAge(a)) || 999;
+        let ageB = parseInt(getStudentAge(b)) || 999;
         if (ageA !== ageB) return ageA - ageB;
         return (a.name || '').localeCompare(b.name || '');
     });
@@ -4385,8 +4439,8 @@ function renderAcademyPayments() {
                     ${student.pic ? '' : initial}
                 </div>
                 <div style="min-width: 0; overflow: hidden;">
-                    <h3 style="font-size: 1.18rem; font-weight: 600; color: ${hasAttended ? (isPaid ? '#10b981' : '#ef4444') : (student.gender === 'Female' ? '#ec4899' : '#fff')}; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; margin: 0;">${escapeHtml(student.name)} ${student.age ? `<span class="player-age-badge" style="margin-left: 6px;">${student.age} Yrs</span>` : ''}</h3>
-                    <p style="font-size: 0.92rem; color: var(--text-muted); margin: 3px 0 0 0; white-space: nowrap; text-overflow: ellipsis; overflow: hidden;">ID: <strong style="color: #f1f5f9;">${escapeHtml(student.id)}</strong> | Parent: <strong style="color: #f1f5f9;">${escapeHtml(student.fatherName || 'N/A')}</strong></p>
+                    <h3 style="font-size: 1.18rem; font-weight: 600; color: ${hasAttended ? (isPaid ? '#10b981' : '#ef4444') : (student.gender === 'Female' ? '#ec4899' : '#fff')}; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; margin: 0;">${escapeHtml(student.name)} ${(() => { const stAge = getStudentAge(student); return stAge && stAge !== '-' ? `<span class="player-age-badge" style="margin-left: 6px;">${stAge} Yrs</span>` : ''; })()}</h3>
+                    <p style="font-size: 0.92rem; color: var(--text-muted); margin-3px 0 0 0; white-space: nowrap; text-overflow: ellipsis; overflow: hidden;">ID: <strong style="color: #f1f5f9;">${escapeHtml(student.id)}</strong> | Parent: <strong style="color: #f1f5f9;">${escapeHtml(student.fatherName || 'N/A')}</strong></p>
                 </div>
             </div>
             
@@ -4651,10 +4705,8 @@ function renderAcademyReports() {
     const studentsToRender = academyStudents.filter(s => isStudentActive(s));
     
     studentsToRender.sort((a, b) => {
-        let ageA = parseInt(a.age);
-        if (isNaN(ageA)) ageA = 999;
-        let ageB = parseInt(b.age);
-        if (isNaN(ageB)) ageB = 999;
+        let ageA = parseInt(getStudentAge(a)) || 999;
+        let ageB = parseInt(getStudentAge(b)) || 999;
         return ageA - ageB;
     });
     
@@ -5708,10 +5760,11 @@ const DASHBOARD_AGE_BRACKETS = [
 
 function getStudentAgeCategoryId(student) {
     if (!student || student.role === 'coach') return null;
-    if (!student.age || student.age === '-' || isNaN(parseInt(student.age))) {
+    const ageVal = getStudentAge(student);
+    if (!ageVal || ageVal === '-' || isNaN(parseInt(ageVal))) {
         return 'unknown';
     }
-    const age = parseInt(student.age);
+    const age = parseInt(ageVal);
     if (age < 6) return 'under-6';
     if (age >= 6 && age <= 7) return '6-7';
     if (age >= 8 && age <= 9) return '8-9';
@@ -6415,8 +6468,8 @@ function renderDashboardAgeStudents() {
 
     // Sort by age ascending, then alphabetically by name
     filtered.sort((a, b) => {
-        const ageA = parseInt(a.age) || 999;
-        const ageB = parseInt(b.age) || 999;
+        const ageA = parseInt(getStudentAge(a)) || 999;
+        const ageB = parseInt(getStudentAge(b)) || 999;
         if (ageA !== ageB) return ageA - ageB;
         return (a.name || '').localeCompare(b.name || '');
     });
@@ -6452,7 +6505,8 @@ function renderDashboardAgeStudents() {
             ? `background-image: url('${student.pic}');` 
             : `background: linear-gradient(135deg, #1e3a8a, #2563eb);`;
         const nameColor = (student.gender === 'Female') ? '#ec4899' : '#ffffff';
-        const ageText = student.age && student.age !== '-' ? `${student.age} Yrs` : 'Age: -';
+        const stAge = getStudentAge(student);
+        const ageText = stAge && stAge !== '-' ? `${stAge} Yrs` : 'Age: -';
 
         return `
             <div class="age-student-row" onclick="openAcademyStudentDetails('${student.id}')" title="Click to view details for ${escapeHtml(student.name)}">
