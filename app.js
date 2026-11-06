@@ -4664,6 +4664,28 @@ function updateAcademyRemark(studentId, value) {
 
 // ================= ACADEMY REPORTS & EXCEL LOGIC =================
 
+function getTodayDateStr() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+function getAcademyActiveDaysForMonth(monthStr) {
+    if (!monthStr) return [];
+    const [year, month] = monthStr.split('-').map(Number);
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const activeDays = [];
+    for (let d = 1; d <= daysInMonth; d++) {
+        const dateObj = new Date(year, month - 1, d);
+        if (dateObj.getDay() === 5 || dateObj.getDay() === 6) { // 5 is Friday, 6 is Saturday
+            activeDays.push(d);
+        }
+    }
+    return activeDays;
+}
+
 function renderAcademyReports() {
     const table = document.getElementById('academy-report-table');
     if(!table) return;
@@ -4676,15 +4698,8 @@ function renderAcademyReports() {
     }
     
     const [year, month] = monthStr.split('-').map(Number);
-    const daysInMonth = new Date(year, month, 0).getDate();
-    
-    const activeDays = [];
-    for(let d = 1; d <= daysInMonth; d++) {
-        const dateObj = new Date(year, month - 1, d);
-        if (dateObj.getDay() === 5 || dateObj.getDay() === 6) { // 5 is Friday, 6 is Saturday
-            activeDays.push(d);
-        }
-    }
+    const activeDays = getAcademyActiveDaysForMonth(monthStr);
+    const todayStr = getTodayDateStr();
 
     let thead = `
         <thead>
@@ -4728,19 +4743,28 @@ function renderAcademyReports() {
                 let dayStatus = '-';
                 let color = '#9ca3af';
                 
-                if(record) {
-                    if(record.status === 'Present') {
-                        dayStatus = 'P';
-                        color = '#10b981';
-                        totalPresent++;
-                    } else if(record.status === 'Absent') {
-                        dayStatus = 'A';
-                        color = '#ef4444';
-                        totalAbsent++;
-                    }
+                if(record && record.status === 'Present') {
+                    dayStatus = 'P';
+                    color = '#10b981';
+                    totalPresent++;
+                } else if((record && record.status === 'Absent') || dateStr <= todayStr) {
+                    dayStatus = 'A';
+                    color = '#ef4444';
+                    totalAbsent++;
+                } else {
+                    dayStatus = '-';
+                    color = '#9ca3af';
                 }
                 daysHtml += `<td style="padding: 14px 16px; font-size: 0.95rem; text-align: center; color: ${color}; font-weight: bold;">${dayStatus}</td>`;
             });
+
+            const extraPresent = academyAttendance.filter(a => 
+                a.studentId === student.id && 
+                a.date && a.date.startsWith(monthStr) && 
+                a.status === 'Present' &&
+                !activeDays.includes(parseInt(a.date.split('-')[2], 10))
+            ).length;
+            totalPresent += extraPresent;
             
             tbody += `
                 <tr style="border-bottom: 1px solid #374151;">
@@ -4803,6 +4827,8 @@ function viewStudentReportHistory(studentId) {
         html = '<p style="text-align: center; color: var(--text-muted); padding: 20px;">No history found for this student.</p>';
         whatsappText += 'No history found.';
     } else {
+        const todayStr = getTodayDateStr();
+
         sortedMonths.forEach(month => {
             // Get Payment
             const payment = academyPayments.find(p => p.studentId === studentId && p.month === month);
@@ -4810,12 +4836,27 @@ function viewStudentReportHistory(studentId) {
             const paymentStatusText = student.role === 'coach' ? 'N/A' : (isPaid ? `Paid (${payment.amount})` : 'Unpaid');
             
             // Get Attendance
+            const monthActiveDays = getAcademyActiveDaysForMonth(month);
             let totalPresent = 0;
             let totalAbsent = 0;
-            academyAttendance.filter(a => a.studentId === studentId && a.date.startsWith(month)).forEach(a => {
-                if (a.status === 'Present') totalPresent++;
-                if (a.status === 'Absent') totalAbsent++;
+
+            monthActiveDays.forEach(d => {
+                const dateStr = `${month}-${String(d).padStart(2, '0')}`;
+                const record = getAcademyAttendanceForDate(dateStr, student.id);
+                if (record && record.status === 'Present') {
+                    totalPresent++;
+                } else if ((record && record.status === 'Absent') || dateStr <= todayStr) {
+                    totalAbsent++;
+                }
             });
+
+            const extraPresent = academyAttendance.filter(a => 
+                a.studentId === student.id && 
+                a.date && a.date.startsWith(month) && 
+                a.status === 'Present' &&
+                !monthActiveDays.includes(parseInt(a.date.split('-')[2], 10))
+            ).length;
+            totalPresent += extraPresent;
 
             html += `
                 <div style="background: rgba(15, 23, 42, 0.4); border: 1px solid #374151; border-radius: 8px; padding: 15px; margin-bottom: 10px;">
