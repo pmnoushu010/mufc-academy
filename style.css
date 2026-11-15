@@ -582,6 +582,64 @@ main::-webkit-scrollbar { display: none; }
     .chat-wrapper {
         height: 400px;
     }
+
+    /* Mobile Attendance Card Responsive Layout */
+    .attendance-player-card {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 8px !important;
+        padding: 10px 12px !important;
+    }
+    .attendance-player-card .player-info {
+        max-width: 100% !important;
+        min-width: 0 !important;
+        width: 100% !important;
+    }
+    .attendance-controls {
+        width: 100% !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        gap: 4px !important;
+        flex-wrap: nowrap !important;
+    }
+    .attendance-btn-group {
+        gap: 4px !important;
+        flex-shrink: 0;
+    }
+    .attendance-btn {
+        padding: 6px 8px !important;
+        font-size: 0.78rem !important;
+        gap: 4px !important;
+    }
+    .attendance-remarks-input {
+        width: 85px !important;
+        min-width: 65px !important;
+        padding: 6px 4px !important;
+        font-size: 0.78rem !important;
+        flex-shrink: 1;
+    }
+    .attendance-remarks-input.attendance-only {
+        width: 120px !important;
+    }
+    .attendance-divider {
+        margin: 0 2px !important;
+        height: 18px !important;
+    }
+    .attendance-payment-group {
+        gap: 4px !important;
+        flex-shrink: 0;
+    }
+    .attendance-fee-input {
+        width: 50px !important;
+        padding: 6px 2px !important;
+        font-size: 0.8rem !important;
+    }
+    .attendance-pay-btn {
+        padding: 6px 8px !important;
+        font-size: 0.78rem !important;
+        gap: 4px !important;
+    }
 }
 
 /* Hide number input arrows */
@@ -1230,6 +1288,134 @@ input[type="number"] {
     display: inline-flex;
     align-items: center;
     gap: 6px;
+}
+
+/* Attendance Player Card (Compact layout with minimal gap) */
+.attendance-player-card {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    gap: 12px !important;
+    padding: 10px 16px !important;
+    border-radius: 12px !important;
+    box-sizing: border-box !important;
+}
+
+.attendance-player-card .player-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 200px;
+    max-width: 260px;
+    flex-shrink: 0;
+    overflow: hidden;
+}
+
+.attendance-player-card .profile-pic {
+    width: 44px !important;
+    height: 44px !important;
+    min-width: 44px !important;
+    font-size: 1.1rem !important;
+    flex-shrink: 0;
+}
+
+.attendance-player-card h3 {
+    font-size: 1.08rem !important;
+    font-weight: 600 !important;
+    margin: 0 !important;
+    white-space: nowrap !important;
+    text-overflow: ellipsis !important;
+    overflow: hidden !important;
+}
+
+.attendance-player-card p {
+    font-size: 0.82rem !important;
+    color: var(--text-muted) !important;
+    margin-top: 2px !important;
+    white-space: nowrap !important;
+    text-overflow: ellipsis !important;
+    overflow: hidden !important;
+}
+
+.attendance-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.attendance-btn-group {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.attendance-btn {
+    padding: 7px 14px !important;
+    border-radius: 8px !important;
+    font-size: 0.85rem !important;
+    font-weight: 600 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 5px !important;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.attendance-remarks-input {
+    width: 140px;
+    padding: 7px 10px !important;
+    border-radius: 8px !important;
+    background: rgba(15, 23, 42, 0.8) !important;
+    color: white !important;
+    border: 1px solid #374151 !important;
+    font-size: 0.85rem !important;
+    box-sizing: border-box;
+}
+
+.attendance-remarks-input.attendance-only {
+    width: 200px;
+}
+
+.attendance-divider {
+    width: 1px;
+    height: 24px;
+    background: #374151;
+    margin: 0 4px;
+    flex-shrink: 0;
+}
+
+.attendance-payment-group {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.attendance-fee-input {
+    width: 65px !important;
+    padding: 7px 4px !important;
+    border-radius: 8px !important;
+    background: rgba(15, 23, 42, 0.8) !important;
+    color: white !important;
+    border: 1px solid #374151 !important;
+    text-align: center !important;
+    font-weight: bold !important;
+    font-size: 0.88rem !important;
+    box-sizing: border-box;
+}
+
+.attendance-pay-btn {
+    padding: 7px 14px !important;
+    border-radius: 8px !important;
+    font-size: 0.85rem !important;
+    font-weight: 600 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 5px !important;
+    white-space: nowrap;
+    cursor: pointer;
 }
 
 /* Student Active / Inactive Status Styles */

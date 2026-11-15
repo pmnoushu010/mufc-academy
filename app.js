@@ -2673,46 +2673,41 @@ function renderAcademyAttendance() {
             : `background: linear-gradient(135deg, #1e3a8a, #2563eb);`;
 
         const paymentControlsHtml = isAttendanceOnly ? '' : `
-            <div style="width: 1px; height: 30px; background: #374151; margin: 0 5px;"></div>
+            <div class="attendance-divider"></div>
             
-            <div style="display: flex; gap: 8px; align-items: center;">
-                <input type="number" id="attendance-fee-${student.id}" value="${amount}" placeholder="SAR" style="width: 90px; padding: 10px; border-radius: 10px; background: rgba(15, 23, 42, 0.8); color: white; border: 1px solid #374151; text-align: center; font-weight: bold; font-size: 0.95rem;" oninput="handleFeeInput(this, '${student.id}', '${monthStr}')">
-                <button id="pay-btn-${student.id}" class="btn-primary" style="padding: 10px 16px; border-radius: 10px; font-size: 0.95rem; font-weight: 600; display: flex; align-items: center; gap: 6px; ${isPaid ? 'background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16,185,129,0.3); opacity: 1;' : (amount > 0 ? 'background: #3b82f6; color: white; border: 1px solid #3b82f6; opacity: 1;' : 'background: #374151; color: #9ca3af; border: 1px solid #374151; opacity: 0.5;')}" onclick="togglePaymentStatusFromAttendance('${student.id}', '${monthStr}')" ${(!isPaid && (!amount || amount <= 0)) || isPaid ? 'disabled' : ''}>
+            <div class="attendance-payment-group">
+                <input type="number" id="attendance-fee-${student.id}" value="${amount}" placeholder="SAR" class="attendance-fee-input" oninput="handleFeeInput(this, '${student.id}', '${monthStr}')">
+                <button id="pay-btn-${student.id}" class="btn-primary attendance-pay-btn" style="${isPaid ? 'background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16,185,129,0.3); opacity: 1;' : (amount > 0 ? 'background: #3b82f6; color: white; border: 1px solid #3b82f6; opacity: 1;' : 'background: #374151; color: #9ca3af; border: 1px solid #374151; opacity: 0.5;')}" onclick="togglePaymentStatusFromAttendance('${student.id}', '${monthStr}')" ${(!isPaid && (!amount || amount <= 0)) || isPaid ? 'disabled' : ''}>
                     <i class="fa-solid fa-wallet"></i> ${isPaid ? 'Paid' : 'Pay'}
                 </button>
             </div>
         `;
 
         const div = document.createElement('div');
-        div.className = 'player-card';
-        div.style.display = 'flex';
-        div.style.alignItems = 'center';
-        div.style.justifyContent = 'space-between';
-        div.style.padding = '16px 22px';
-        div.style.gap = '20px';
+        div.className = 'player-card attendance-player-card';
         
         div.innerHTML = `
-            <div class="player-info" style="display: flex; align-items: center; gap: 16px; min-width: 240px;">
-                <div class="profile-pic" style="min-width: 50px; height: 50px; ${avatarStyle}">
+            <div class="player-info">
+                <div class="profile-pic" style="${avatarStyle}">
                     ${student.pic ? '' : initial}
                 </div>
                 <div style="overflow: hidden;">
-                    <h3 style="font-size: 1.25rem; font-weight: 600; color: ${nameColor}; white-space: nowrap; text-overflow: ellipsis; overflow: hidden;">${escapeHtml(student.name)} ${(() => { const stAge = getStudentAge(student); return (stAge && stAge !== '-' ? `<span class="player-age-badge" style="margin-left: 6px;">${stAge} Yrs</span>` : ''); })()} ${paidCheckmark}</h3>
-                    <p style="font-size: 0.95rem; color: var(--text-muted); margin-top: 3px;">ID: <strong style="color: #f1f5f9;">${escapeHtml(student.id)}</strong> | Parent: <strong style="color: #f1f5f9;">${escapeHtml(student.fatherName || 'N/A')}</strong></p>
+                    <h3 style="color: ${nameColor};">${escapeHtml(student.name)} ${(() => { const stAge = getStudentAge(student); return (stAge && stAge !== '-' ? `<span class="player-age-badge" style="margin-left: 6px;">${stAge} Yrs</span>` : ''); })()} ${paidCheckmark}</h3>
+                    <p>ID: <strong style="color: #f1f5f9;">${escapeHtml(student.id)}</strong> | Parent: <strong style="color: #f1f5f9;">${escapeHtml(student.fatherName || 'N/A')}</strong></p>
                 </div>
             </div>
             
-            <div style="display: flex; align-items: center; gap: 14px; flex: 1; justify-content: flex-end;">
-                <div style="display: flex; gap: 8px;">
-                    <button class="btn-primary" style="padding: 10px 16px; border-radius: 10px; font-size: 0.95rem; font-weight: 600; display: flex; align-items: center; gap: 6px; ${isPresent ? 'background: #10b981; color: white; border-color: #10b981;' : 'opacity: 0.6; background: #374151; border-color: #374151; color: #9ca3af;'}" onclick="markAcademyAttendance('${student.id}', '${dateStr}', 'Present')">
+            <div class="attendance-controls">
+                <div class="attendance-btn-group">
+                    <button class="btn-primary attendance-btn" style="${isPresent ? 'background: #10b981; color: white; border-color: #10b981;' : 'opacity: 0.6; background: #374151; border-color: #374151; color: #9ca3af;'}" onclick="markAcademyAttendance('${student.id}', '${dateStr}', 'Present')">
                         <i class="fa-solid fa-check"></i> Present
                     </button>
-                    <button class="btn-secondary" style="padding: 10px 16px; border-radius: 10px; font-size: 0.95rem; font-weight: 600; display: flex; align-items: center; gap: 6px; ${!isPresent ? 'background: #ef4444; color: white; border-color: #ef4444;' : 'opacity: 0.6; background: #374151; border-color: #374151; color: #9ca3af;'}" onclick="markAcademyAttendance('${student.id}', '${dateStr}', 'Absent')">
+                    <button class="btn-secondary attendance-btn" style="${!isPresent ? 'background: #ef4444; color: white; border-color: #ef4444;' : 'opacity: 0.6; background: #374151; border-color: #374151; color: #9ca3af;'}" onclick="markAcademyAttendance('${student.id}', '${dateStr}', 'Absent')">
                         <i class="fa-solid fa-xmark"></i> Absent
                     </button>
                 </div>
                 
-                <input type="text" maxlength="25" value="${escapeHtml(student.remarks || '')}" placeholder="Remarks (Max 25)" style="width: ${isAttendanceOnly ? '320px' : '250px'}; padding: 10px 14px; border-radius: 10px; background: rgba(15, 23, 42, 0.8); color: white; border: 1px solid #374151; font-size: 0.95rem;" onchange="updateAcademyRemark('${student.id}', this.value)">
+                <input type="text" maxlength="25" value="${escapeHtml(student.remarks || '')}" placeholder="Remarks (Max 25)" class="attendance-remarks-input ${isAttendanceOnly ? 'attendance-only' : ''}" onchange="updateAcademyRemark('${student.id}', this.value)">
                 
                 ${paymentControlsHtml}
             </div>
@@ -2868,42 +2863,37 @@ function renderAcademyCoachAttendance() {
             : `background: linear-gradient(135deg, #1e3a8a, #2563eb);`;
 
         const div = document.createElement('div');
-        div.className = 'player-card';
-        div.style.display = 'flex';
-        div.style.alignItems = 'center';
-        div.style.justifyContent = 'space-between';
-        div.style.padding = '16px 22px';
-        div.style.gap = '20px';
+        div.className = 'player-card attendance-player-card';
         
         div.innerHTML = `
-            <div class="player-info" style="display: flex; align-items: center; gap: 16px; min-width: 260px;">
-                <div class="profile-pic" style="min-width: 50px; height: 50px; border-radius: 50%; ${avatarStyle}">
+            <div class="player-info">
+                <div class="profile-pic" style="${avatarStyle}">
                     ${coach.pic ? '' : initial}
                 </div>
                 <div style="overflow: hidden;">
-                    <h3 style="font-size: 1.25rem; font-weight: 600; color: #3b82f6; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; margin: 0;">
+                    <h3 style="color: #3b82f6;">
                         ${escapeHtml(coach.name)}
                         <span style="font-size: 0.8rem; background: rgba(59,130,246,0.2); color: #3b82f6; padding: 2px 8px; border-radius: 6px; margin-left: 6px; vertical-align: middle;">Coach</span>
                         ${isPresent ? '<i class="fa-solid fa-circle-check" style="font-size: 0.95rem; color: #10b981; margin-left: 6px;" title="Present Today"></i>' : ''}
                     </h3>
-                    <p style="font-size: 0.95rem; color: var(--text-muted); margin-top: 4px;">
+                    <p>
                         Mobile: <strong style="color: #f1f5f9;">${escapeHtml(coach.mobile || coach.id)}</strong>
                         ${coach.whatsapp ? ` | WhatsApp: <strong style="color: #22c55e;">${escapeHtml(coach.whatsapp)}</strong>` : ''}
                     </p>
                 </div>
             </div>
             
-            <div style="display: flex; align-items: center; gap: 14px; flex: 1; justify-content: flex-end;">
-                <div style="display: flex; gap: 8px;">
-                    <button class="btn-primary" style="padding: 10px 18px; border-radius: 10px; font-size: 0.95rem; font-weight: 600; display: flex; align-items: center; gap: 6px; ${isPresent ? 'background: #10b981; color: white; border-color: #10b981;' : 'opacity: 0.6; background: #374151; border-color: #374151; color: #9ca3af;'}" onclick="markAcademyCoachAttendance('${escapeHtml(coach.id)}', '${dateStr}', 'Present')">
+            <div class="attendance-controls">
+                <div class="attendance-btn-group">
+                    <button class="btn-primary attendance-btn" style="${isPresent ? 'background: #10b981; color: white; border-color: #10b981;' : 'opacity: 0.6; background: #374151; border-color: #374151; color: #9ca3af;'}" onclick="markAcademyCoachAttendance('${escapeHtml(coach.id)}', '${dateStr}', 'Present')">
                         <i class="fa-solid fa-check"></i> Present
                     </button>
-                    <button class="btn-secondary" style="padding: 10px 18px; border-radius: 10px; font-size: 0.95rem; font-weight: 600; display: flex; align-items: center; gap: 6px; ${!isPresent ? 'background: #ef4444; color: white; border-color: #ef4444;' : 'opacity: 0.6; background: #374151; border-color: #374151; color: #9ca3af;'}" onclick="markAcademyCoachAttendance('${escapeHtml(coach.id)}', '${dateStr}', 'Absent')">
+                    <button class="btn-secondary attendance-btn" style="${!isPresent ? 'background: #ef4444; color: white; border-color: #ef4444;' : 'opacity: 0.6; background: #374151; border-color: #374151; color: #9ca3af;'}" onclick="markAcademyCoachAttendance('${escapeHtml(coach.id)}', '${dateStr}', 'Absent')">
                         <i class="fa-solid fa-xmark"></i> Absent
                     </button>
                 </div>
                 
-                <input type="text" maxlength="25" value="${escapeHtml(coach.remarks || '')}" placeholder="Remarks (Max 25)" style="width: 250px; padding: 10px 14px; border-radius: 10px; background: rgba(15, 23, 42, 0.8); color: white; border: 1px solid #374151; font-size: 0.95rem;" onchange="updateAcademyCoachRemark('${escapeHtml(coach.id)}', this.value)">
+                <input type="text" maxlength="25" value="${escapeHtml(coach.remarks || '')}" placeholder="Remarks (Max 25)" class="attendance-remarks-input attendance-only" onchange="updateAcademyCoachRemark('${escapeHtml(coach.id)}', this.value)">
             </div>
         `;
         list.appendChild(div);
