@@ -2945,6 +2945,12 @@ function calculateCoachSalaryDetails(coach, monthStr) {
     const workingDays = getWorkingDaysForMonth(monthStr);
     const totalWorkingDays = workingDays.length;
     const coachIdStr = String(coach.id);
+    const todayStr = (typeof getTodayDateStr === 'function') 
+        ? getTodayDateStr() 
+        : (() => {
+            const now = new Date();
+            return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        })();
     
     // Constant monthly base salary for this coach
     const baseSalary = parseFloat(coach.salary || coach.monthlySalary || 0) || 0;
@@ -2964,7 +2970,7 @@ function calculateCoachSalaryDetails(coach, monthStr) {
         if (record && record.status === 'Present') {
             status = 'Present';
             presentCount++;
-        } else if (record && record.status === 'Absent') {
+        } else if ((record && record.status === 'Absent') || w.dateStr <= todayStr) {
             status = 'Absent';
             absentCount++;
         } else {
