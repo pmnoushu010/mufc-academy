@@ -1290,13 +1290,13 @@ input[type="number"] {
     gap: 6px;
 }
 
-/* Attendance Player Card (Compact layout with minimal gap) */
+/* Attendance Player Card (Spacious layout with proper gap) */
 .attendance-player-card {
     display: flex !important;
     align-items: center !important;
-    justify-content: flex-start !important;
-    gap: 12px !important;
-    padding: 10px 16px !important;
+    justify-content: space-between !important;
+    gap: 24px !important;
+    padding: 14px 20px !important;
     border-radius: 12px !important;
     box-sizing: border-box !important;
 }
@@ -1304,23 +1304,22 @@ input[type="number"] {
 .attendance-player-card .player-info {
     display: flex;
     align-items: center;
-    gap: 10px;
-    min-width: 200px;
-    max-width: 260px;
-    flex-shrink: 0;
+    gap: 14px;
+    flex: 1;
+    min-width: 260px;
     overflow: hidden;
 }
 
 .attendance-player-card .profile-pic {
-    width: 44px !important;
-    height: 44px !important;
-    min-width: 44px !important;
-    font-size: 1.1rem !important;
+    width: 48px !important;
+    height: 48px !important;
+    min-width: 48px !important;
+    font-size: 1.15rem !important;
     flex-shrink: 0;
 }
 
 .attendance-player-card h3 {
-    font-size: 1.08rem !important;
+    font-size: 1.18rem !important;
     font-weight: 600 !important;
     margin: 0 !important;
     white-space: nowrap !important;
@@ -1329,9 +1328,9 @@ input[type="number"] {
 }
 
 .attendance-player-card p {
-    font-size: 0.82rem !important;
+    font-size: 0.88rem !important;
     color: var(--text-muted) !important;
-    margin-top: 2px !important;
+    margin-top: 3px !important;
     white-space: nowrap !important;
     text-overflow: ellipsis !important;
     overflow: hidden !important;
@@ -1340,7 +1339,7 @@ input[type="number"] {
 .attendance-controls {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
     flex-shrink: 0;
 }
 
@@ -1352,9 +1351,9 @@ input[type="number"] {
 }
 
 .attendance-btn {
-    padding: 7px 14px !important;
+    padding: 8px 14px !important;
     border-radius: 8px !important;
-    font-size: 0.85rem !important;
+    font-size: 0.88rem !important;
     font-weight: 600 !important;
     display: inline-flex !important;
     align-items: center !important;
@@ -1364,23 +1363,23 @@ input[type="number"] {
 }
 
 .attendance-remarks-input {
-    width: 140px;
-    padding: 7px 10px !important;
+    width: 170px;
+    padding: 8px 10px !important;
     border-radius: 8px !important;
     background: rgba(15, 23, 42, 0.8) !important;
     color: white !important;
     border: 1px solid #374151 !important;
-    font-size: 0.85rem !important;
+    font-size: 0.88rem !important;
     box-sizing: border-box;
 }
 
 .attendance-remarks-input.attendance-only {
-    width: 200px;
+    width: 240px;
 }
 
 .attendance-divider {
     width: 1px;
-    height: 24px;
+    height: 26px;
     background: #374151;
     margin: 0 4px;
     flex-shrink: 0;
@@ -1394,22 +1393,22 @@ input[type="number"] {
 }
 
 .attendance-fee-input {
-    width: 65px !important;
-    padding: 7px 4px !important;
+    width: 75px !important;
+    padding: 8px 6px !important;
     border-radius: 8px !important;
     background: rgba(15, 23, 42, 0.8) !important;
     color: white !important;
     border: 1px solid #374151 !important;
     text-align: center !important;
     font-weight: bold !important;
-    font-size: 0.88rem !important;
+    font-size: 0.9rem !important;
     box-sizing: border-box;
 }
 
 .attendance-pay-btn {
-    padding: 7px 14px !important;
+    padding: 8px 16px !important;
     border-radius: 8px !important;
-    font-size: 0.85rem !important;
+    font-size: 0.88rem !important;
     font-weight: 600 !important;
     display: inline-flex !important;
     align-items: center !important;
